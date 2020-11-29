@@ -3,7 +3,7 @@ import numpy.random as rand
 import numpy as np
 from Model import Model
 import random
-def getLSOnInfer(infer, P=None):
+def getLSOnInfer(infer, P=None, start=None, end=None):
 
     paramM=infer.data.parametersMean
     paramV=infer.data.parametersVar
@@ -11,7 +11,7 @@ def getLSOnInfer(infer, P=None):
     input=infer.data.input
     output=infer.data.output
 
-    return getMeanLS(input, output, paramM, infer.model, paramVar=paramV, P=P)
+    return getMeanLS(input, output, paramM, infer.model, paramVar=paramV,start=start, end=end, P=P)
 
 
 def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=None , P=None):
@@ -38,8 +38,8 @@ def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=Non
 
             for k, f in enumerate(model.yFunctions):
                 p=f(paramMean[i], xij, add=s)
-                print(p)
-                LS1 -= P[i][j][k] * math.log(p)
+                pReal=P[i][j][k]
+                LS1 -=  pReal* math.log(p)
 
 
         LS2 += (LS1/(j+1))
@@ -96,12 +96,28 @@ def biasedDice(bias):
             sum+=val
 
 
-def optiBetaAlpa(trainingSets):
+def naiveOpti(function, intervals):
+
+    combinations=[[]]
+    values=[]
+
+    for inter in intervals:
+        newCombinations=[]
+        for comb in combinations:
+            for val in inter:
+
+                newComb=comb.copy()
+                newComb.append(val)
+                newCombinations.append(newComb)
+
+        combinations=newCombinations
+
+    for comb in combinations:
+        values.append(function(comb))
+
+    return combinations[values.index(min(values))]
 
 
-
-    for sets in trainingSets:
-        pass
 
 def goldenSearch(function, functionArgs, initIntervals, reduction=0.05):
 

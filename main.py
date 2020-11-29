@@ -6,16 +6,17 @@ import numpy as np
 import numpy.random as rand
 import random
 from Misc import *
+from Presentation import *
 np.seterr("raise")
 
 def test():
-    data=SDS("2018-2019", "H")
+    data=SDS("2015-2016", "H")
     d=data.data
     rk=Model("Thurstone", 600, args=[0.5])
-    alpha=60
-    beta=0.99
+    alpha=25
+    beta=0.9994
 
-    d.setVar0(1)
+    d.setVar0(alpha)
     inf1 = Infer(d, rk)
     inf1.infer(alpha, beta, iter=1)
     print(getLSOnInfer(inf1))
@@ -113,9 +114,12 @@ def optiOn5(iter=1):
 
 def optiOnHockey(iter=1):
 
-    model=Model("Thurstone", 10)
+    scale=600
+
+    model=Model("Thurstone", scale)
 
     seasons=["2007-2008","2008-2009","2009-2010", "2010-2011","2011-2012"]
+    #seasons=["2007-2008"]
 
     infers=[]
 
@@ -138,8 +142,19 @@ def optiOnHockey(iter=1):
 
         return ret
 
-    val=goldenSearch(LSon5, ["alpha","beta"], [[0.1, 10],[0.98, 1]])
-    print(val)
+    #alphRange=np.arange(1,101, 20)
+    #betRange=np.arange(999, 1000, 0.2)/1000
+    alphRange=np.arange(0,51, 5)
+    betRange=np.arange(9990, 10001, 2)/10000
 
-#optiOnHockey(iter=1)
-test3()
+    #25, 0,9994
+
+    #val=naiveOpti(LSon5, [alphRange, betRange])
+    #print(val)
+
+    plotLS3D(LSon5, alphRange, betRange, scale)
+
+
+
+optiOnHockey(iter=1)
+#test()
