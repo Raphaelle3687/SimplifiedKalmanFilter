@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.stats import norm
 import math
-class Infer:
+class SKF:
     def __init__(self, data, model):
         self.data=data
         self.model=model
+        self.data.setCov(False)
         if data.dim!=model.yDim:
             raise Exception("Dimension of the output of the model should match that of the data")
 
@@ -15,15 +16,16 @@ class Infer:
 
         paramMean=self.data.parametersMean
         paramVar=self.data.parametersVar
+
         for i, Xi in enumerate(X):
 
             if i+1==len(X):
                 continue
 
-            for j, xij in enumerate(Xi):
+            theta_I = beta * paramMean[i]
+            var_I = (((beta**2)*paramVar[i]) + alpha)
 
-                theta_I = beta*paramMean[i]
-                var_I = paramVar[i]
+            for j, xij in enumerate(Xi):
 
                 u = (beta ** 2 * var_I + alpha) * xij
                 d = u * u
@@ -38,7 +40,7 @@ class Infer:
                 paramMean[i+1]=theta_I
 
                 ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                varI = (((beta**2)*var_I) + alpha) - (d * (ht) / (1 + ht * s))
+                varI = var_I - (d * (ht) / (1 + ht * s))
                 paramVar[i + 1] = varI
 
 

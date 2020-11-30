@@ -8,6 +8,7 @@ class DataSet:
         self.output=output#np array of y
         self.P=None
         self.dim=output.shape[2]
+        self.cov=False
         if len(input)!=len(output):
             raise Exception("Length of the input and output should match")
 
@@ -18,6 +19,16 @@ class DataSet:
 
         self.syntheticOutput = None
         self.syntheticParameters = None
+
+    def setCov(self, isCov):
+
+        self.cov=isCov
+        dim=self.parametersMean.shape
+        if isCov:
+            self.parametersVar=np.zeros([dim[0], dim[1], dim[1]])
+        else:
+            self.parametersVar=np.zeros([dim[0], dim[1]])
+
 
     def resetParam(self):
         dimParam=[self.input.shape[0], self.input.shape[2]]
@@ -77,6 +88,7 @@ class DataSet:
 
     def setVar0(self, var):
 
-        for i in range(len(self.parametersVar[0])):
-            self.parametersVar[0][i]=var
-
+        if self.cov==True:
+            self.parametersVar[0] += np.identity(self.parametersVar.shape[1])*var
+        else:
+            self.parametersVar[0] += var

@@ -1,13 +1,30 @@
 from SportDataSet import SportDataSet as SDS
 from Model import Model
-from Infer import Infer
+from SKF import SKF
 from DataSet import DataSet
 import numpy as np
 import numpy.random as rand
 import random
 from Misc import *
 from Presentation import *
+from KalmanFilter import KF
 np.seterr("raise")
+
+def testK():
+    data=SDS("2018-2019", "H")
+    d=data.data
+    rk=Model("Thurstone", 600, args=[0.5])
+    alpha=30
+    beta=0.9992
+
+    d.setVar0(alpha)
+    inf1 = KF(d, rk)
+    inf1.infer(alpha, beta, iter=1)
+    print(getLSOnInfer(inf1))
+
+    for m in range(len(d.parametersMean[-1])):
+        print(data.ItoPlayers[m])
+        print(d.parametersMean[-1][m])
 
 def test():
     data=SDS("2015-2016", "H")
@@ -17,7 +34,7 @@ def test():
     beta=0.9994
 
     d.setVar0(alpha)
-    inf1 = Infer(d, rk)
+    inf1 = SKF(d, rk)
     inf1.infer(alpha, beta, iter=1)
     print(getLSOnInfer(inf1))
 
@@ -34,12 +51,12 @@ def test2D():
     dSynth = d.generateSynthetic(alpha, rk)
     # d.output=dSynth.output
 
-    infSynth = Infer(dSynth, rk)
+    infSynth = SKF(dSynth, rk)
     print(infSynth.getMeanLS())
 
     dSynthToInfer = DataSet(dSynth.input, dSynth.output)
     dSynthToInfer.setVar0(1)
-    infSynth2 = Infer(dSynthToInfer, rk)
+    infSynth2 = SKF(dSynthToInfer, rk)
     infSynth2.infer(beta, alpha, iter=1)
     print(infSynth2.getMeanLS())
 
@@ -63,7 +80,7 @@ def test3():
 
     data=DataSet(X, Y)
     data.setVar0(alpha)
-    inf=Infer(data, model)
+    inf=SKF(data, model)
     inf.infer(alpha, beta)
     print(getLSOnInfer(inf, P=P))
 
@@ -87,9 +104,9 @@ def optiOn5(iter=1):
 
     for i in range(0, 5):
         data=createSyntheticDataSet(alpha, beta, model)
-        infers.append(Infer(data, model))
+        infers.append(SKF(data, model))
 
-    infTest=Infer(createSyntheticDataSet(alpha, beta, model), model)
+    infTest=SKF(createSyntheticDataSet(alpha, beta, model), model)
 
     def LSon5(params):
         alph=params[0]
@@ -114,7 +131,7 @@ def optiOn5(iter=1):
 
 def optiOnHockey(iter=1):
 
-    scale=600
+    scale=100
 
     model=Model("Thurstone", scale)
 
@@ -125,7 +142,7 @@ def optiOnHockey(iter=1):
 
     for s in seasons:
         data=SDS(s, "H")
-        infers.append(Infer(data.data, model))
+        infers.append(SKF(data.data, model))
 
     def LSon5(params):
         alph=params[0]
@@ -144,7 +161,7 @@ def optiOnHockey(iter=1):
 
     #alphRange=np.arange(1,101, 20)
     #betRange=np.arange(999, 1000, 0.2)/1000
-    alphRange=np.arange(0,51, 5)
+    alphRange=np.arange(0,2.1, 0.2)
     betRange=np.arange(9990, 10001, 2)/10000
 
     #25, 0,9994
@@ -156,5 +173,5 @@ def optiOnHockey(iter=1):
 
 
 
-optiOnHockey(iter=1)
-#test()
+#optiOnHockey(iter=1)
+testK()

@@ -34,7 +34,11 @@ def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=Non
             if paramVar is None:
                 s=0
             else:
-                s = np.dot(xij.transpose(), xij * paramVar[i])
+                if paramVar[i].ndim==2:
+                    var=np.dot( paramVar[i], xij)
+                    s=np.dot(xij.transpose(),var)
+                else:
+                    s = np.dot(xij.transpose(), xij * paramVar[i])
 
             for k, f in enumerate(model.yFunctions):
                 p=f(paramMean[i], xij, add=s)
