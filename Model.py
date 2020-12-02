@@ -7,6 +7,7 @@ class Model:
         self.yFunctions=[]
         self.yFunctionsOrd1=[]
         self.yFunctionsOrd2=[]
+        self.scale=scale
         #self.Loss=None
         #self.LossOrd1=None
         #self.LossOrd2=None

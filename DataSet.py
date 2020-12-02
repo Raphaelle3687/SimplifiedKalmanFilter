@@ -89,6 +89,6 @@ class DataSet:
     def setVar0(self, var):
 
         if self.cov==True:
-            self.parametersVar[0] += np.identity(self.parametersVar.shape[1])*var
+            self.parametersVar[0] = np.identity(self.parametersVar.shape[1])*var
         else:
-            self.parametersVar[0] += var
+            self.parametersVar[0] = (np.zeros(len(self.parametersVar[0]))*+var)

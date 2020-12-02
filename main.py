@@ -18,13 +18,16 @@ def testK():
     beta=0.9992
 
     d.setVar0(alpha)
-    inf1 = KF(d, rk)
+    inf1 = SKF(d, rk)
     inf1.infer(alpha, beta, iter=1)
     print(getLSOnInfer(inf1))
 
     for m in range(len(d.parametersMean[-1])):
         print(data.ItoPlayers[m])
         print(d.parametersMean[-1][m])
+
+    #print(d.parametersVar[100])
+    #print(d.parametersVar[-1])
 
 def test():
     data=SDS("2015-2016", "H")
@@ -33,10 +36,11 @@ def test():
     alpha=25
     beta=0.9994
 
-    d.setVar0(alpha)
     inf1 = SKF(d, rk)
     inf1.infer(alpha, beta, iter=1)
     print(getLSOnInfer(inf1))
+
+    d.resetParam()
 
     for m in range(len(d.parametersMean[-1])):
         print(data.ItoPlayers[m])
@@ -89,15 +93,18 @@ def test3():
     print(data.parametersVar)
 
 def createSyntheticDataSet(alpha, beta, model):
-    X, Y, P, skills = genCompleteSynth(200, 100, alpha, beta, model=model)
+    X, Y, P, skills = genCompleteSynth(40, 200, alpha, beta, model=model)
     data=DataSet(X, Y)
     data.P=P
     return data
 
 def optiOn5(iter=1):
-    scale = 0.5
-    alpha = 0.2
-    beta = 0.95
+    scale = 10
+    beta = 0.99
+    alpha = (1 - beta ** 2)*100
+
+    print("genValues:", alpha, beta)
+
     model = Model("Thurstone", scale)
 
     infers=[]
@@ -123,8 +130,10 @@ def optiOn5(iter=1):
 
         return ret
 
-    val=goldenSearch(LSon5, ["alpha","beta"], [[0, 10],[0.95, 1]])
-    print(val)
+
+    alphRange=np.arange(0.5,5.1, 0.5)
+    betRange=np.arange(9900, 10001, 20)/10000
+    val=plotLS3D(LSon5, alphRange, betRange, scale)
 
     infTest.infer(val["alpha"], val["beta"], iter=iter)
     print(getLSOnInfer(infTest))
@@ -142,7 +151,7 @@ def optiOnHockey(iter=1):
 
     for s in seasons:
         data=SDS(s, "H")
-        infers.append(SKF(data.data, model))
+        infers.append(KF(data.data, model))
 
     def LSon5(params):
         alph=params[0]
@@ -175,3 +184,4 @@ def optiOnHockey(iter=1):
 
 #optiOnHockey(iter=1)
 testK()
+#optiOn5()
