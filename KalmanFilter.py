@@ -14,10 +14,12 @@ class KF:
         X=self.data.input
         Y=self.data.output
 
+        self.data.setVar0(self.model.scale)
+        if self.data.cov==False:
+            self.data.setCov(True)
+
         paramMean=self.data.parametersMean
         paramVar=self.data.parametersVar
-        if paramVar[0][0][0]==0:
-            self.data.setVar0(alpha)
 
         for i, Xi in enumerate(X):
 
@@ -34,14 +36,15 @@ class KF:
                     gt=self.model.L1(theta_I, xij, Y[i][j], add=0)
                     ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
                     VtINV=np.linalg.inv(varC_I)
-                    Vt=np.linalg.inv ( ht*np.dot(xij, xij.transpose()) + VtINV )
+                    A=np.matmul(xij.reshape(len(xij), 1), xij.reshape(1, len(xij)))
+                    Vt=np.linalg.inv ( ht*A + VtINV )
                     temp= xij*gt + xij*np.dot(ht*xij.transpose(), theta_I) + np.dot(VtINV, beta*paramMean[i])
                     theta_I= np.dot(Vt, temp)
 
                 paramMean[i+1]=theta_I
 
                 ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                Vt = np.linalg.inv(ht * np.dot(xij, xij.transpose()) + VtINV)
+                Vt = np.linalg.inv(ht * A + VtINV)
                 paramVar[i + 1] = Vt
 
 

@@ -14,6 +14,10 @@ class SKF:
         X=self.data.input
         Y=self.data.output
 
+        self.data.setVar0(self.model.scale)
+        if self.data.cov==True:
+            self.data.setCov(False)
+
         paramMean=self.data.parametersMean
         paramVar=self.data.parametersVar
 
