@@ -10,7 +10,7 @@ class Model:
         self.yFunctionsOrd2=[]
         self.estimates=[]
         self.scale=scale
-        self.mode="";
+        self.mode=""
         #self.Loss=None
         #self.LossOrd1=None
         #self.LossOrd2=None
@@ -47,7 +47,6 @@ class Model:
             self.yFunctions.append(r.FH); self.yFunctions.append(r.FA);
             self.yFunctionsOrd1.append(r.derLogFh); self.yFunctionsOrd1.append(r.derLogFa);
             self.yFunctionsOrd2.append(r.hessianH); self.yFunctionsOrd2.append(r.hessianA);
-            self.estimates.append(r.estimatePH); self.estimates.append(r.estimatePA) #Use of dat wild estimate
             self.mode = "discrete"
 
         elif mod=="Gaussian":
@@ -132,7 +131,7 @@ class Model:
 
         if self.mode=="discrete":
             probs=np.array(probs)
-            #probs=probs/np.sum(probs)
+            probs=probs/np.sum(probs)
         return probs
 
 class Elo:
@@ -181,30 +180,6 @@ class BradleyTerry:
     def __init__(self, scale):
         self.scale=scale
         self.dim=2
-
-    def estimatePA(self, theta, x, V, infer):
-
-        theta, V = infer.microInfer(theta, V, x, [0, 1])
-
-        if V.ndim==1:
-            V=np.diag(V)
-
-        var=np.linalg.multi_dot([x.transpose(), V, x])
-        m=np.dot(theta, x)
-        val=norm.cdf(-m/np.sqrt(var))
-        return val
-
-    def estimatePH(self, theta, x, V, infer):
-
-        theta, V = infer.microInfer(theta, V, x, [1, 0])
-
-        if V.ndim==1:
-            V=np.diag(V)
-
-        var=np.linalg.multi_dot([x.transpose(), V, x])
-        m=np.dot(theta, x)
-        val=norm.cdf(m/np.sqrt(var))
-        return val
 
     def FH(self, theta, x, add=0):
         s=self.scale+add
