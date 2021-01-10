@@ -3,71 +3,52 @@ import numpy.random as rand
 import numpy as np
 from Model import Model
 import random
-def getLSOnInfer(infer, P=None, start=None, end=None):
+from DataSet import DataSet
+from SportDataSet import SportDataSet
+from scipy.stats import norm
 
-    paramM=infer.data.parametersMean
-    paramV=infer.data.parametersVar
-    #paramV=None
-    input=infer.data.input
-    output=infer.data.output
+def randomWalk(beta, epsilon,N, D):
+    skills=np.zeros([D, N])
+    I=np.identity(skills.shape[1])
+    covMat=I*epsilon
+    skills[0]=rand.multivariate_normal(skills[0], covMat)
 
-    return getMeanLS(input, output, paramM, infer.model, paramVar=paramV,start=start, end=end, P=P)
+    for i in range(D):
+        if i==0:
+            continue
+        skills[i] = rand.multivariate_normal(beta * skills[i - 1], covMat)
 
+    return skills
 
-def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=None , P=None):
-    LS2 = 0
-    if start == None:
-        start = 0
-    if end == None:
-        end = len(input)
+def genSynthGaussian(N, D, epsilon, beta, scale=1):
+    skills=randomWalk(beta, epsilon, N, D)
+    X = np.zeros([D, N, N])
+    Y = np.zeros([D, N, 1])
+    P = np.zeros([D, N, 1])
+    for i in range(D):
+        for j in range(N):
+            xij=np.zeros(N)
+            xij[j]=1
+            X[i][j] = xij
+            z = np.dot(xij, skills[i])
+            ech = rand.randn(1)
+            yij = (ech + z) * scale
+            #pij = norm.pdf(ech)
+            Y[i][j] = yij
+            P[i][j] = 1
 
-    if P is None:
-        P = output
+    return X,Y,P,skills
 
-    for i in range(start, end):
-
-        Xi =input[i]
-
-        LS1 = 0
-        for j, xij in enumerate(Xi):
-
-            if paramVar is None:
-                s=0
-            else:
-                if paramVar[i].ndim==2:
-                    var=np.dot( paramVar[i], xij)
-                    s=np.dot(xij.transpose(),var)
-                else:
-                    s = np.dot(xij.transpose(), xij * paramVar[i])
-
-            for k, f in enumerate(model.yFunctions):
-                p=f(paramMean[i], xij, add=s)
-                pReal=P[i][j][k]
-                LS1 -=  pReal* math.log(p)
-
-
-        LS2 += (LS1/(j+1))
-
-    return LS2 / (end - start)
-
-
-def genCompleteSynth(M, D, alpha, beta, model=Model("Thurstone", 2)):
+def genSynthModel(M, D, alpha, beta, model=Model("Thurstone", 1)):
 
     indexA=np.arange(0, M).tolist()
 
-    skills=np.zeros([D, M])
+    skills=randomWalk(beta, alpha, D)
     X=np.zeros([D,int(M/2), M])
     Y=np.zeros([D,int(M/2), model.yDim])
     P=np.zeros([D,int(M/2), model.yDim])
 
-    covMat = np.identity(skills.shape[1])*((alpha)/(1-beta**2))
-    skills[0]=rand.multivariate_normal(skills[0], covMat)
-    covMat=np.identity(skills.shape[1])*alpha
-
     for i in range(0, D):
-
-        if i!=0:
-            skills[i]=rand.multivariate_normal(beta*skills[i-1], covMat)
 
         newSchedule=random.sample(indexA, len(indexA))
 
@@ -79,7 +60,7 @@ def genCompleteSynth(M, D, alpha, beta, model=Model("Thurstone", 2)):
             pij=np.zeros(model.yDim)
 
             for k, f in enumerate(model.yFunctions):
-                pij[k]=  f (beta*skills[i], xij)
+                pij[k]=  f (skills[i], xij)
 
             yij=np.zeros(model.yDim)
             yij[biasedDice(pij)]=1
@@ -98,6 +79,88 @@ def biasedDice(bias):
             return i
         else:
             sum+=val
+
+def createSyntheticDataSet(alpha, beta, model, players=10, days=100, variant=""):
+    if variant=="gaussian":
+        X, Y, P, skills = genSynthGaussian(players, days, alpha, beta, scale=model.scale)
+    else:
+        X, Y, P, skills = genSynthModel(players, days, alpha, beta, model=model)
+    data=DataSet(X, Y)
+    data.P=P
+    return data
+
+seasons_K=["2007-2008", "2008-2009", "2009-2010", "2010-2011", "2011-2012"]
+dataNHL_K=[]
+dataS1_K=[]
+dataS2_K=[]
+
+seasons=["2013-2014", "2014-2015", "2015-2016", "2016-2017", "2017-2018"]
+dataNHL=[]
+dataS1=[]
+dataS2=[]
+dataGauss=[]
+
+mod=Model("Thurstone", 1)
+beta=0.98
+epsilon=(1-beta**2)
+for i in range(5):
+    if False:
+        dataNHL_K.append(SportDataSet(seasons_K[i], "H").data)
+        dataS1_K.append(createSyntheticDataSet(epsilon, beta, mod, players=12, days=200))
+        dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
+    if True:
+        dataNHL.append(SportDataSet(seasons[i], "H").data)
+        #dataS1.append(createSyntheticDataSet(epsilon, beta, mod, players=12, days=200))
+        #dataS2.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
+        #dataGauss.append(createSyntheticDataSet(epsilon, beta,mod, players=5, days=1000, variant="gaussian"))
+
+K_H=0.0081
+K_S1=0.0850
+K_S2=0.0867
+
+
+
+
+def getLSOnInfer(infer, P=None, start=None, end=None):
+
+    paramM=infer.data.parametersMean
+    paramV=infer.data.parametersVar
+    #paramV=None
+    input=infer.data.input
+    output=infer.data.output
+
+    return getMeanLS(input, output, paramM, infer.model, paramVar=paramV,start=start, end=end, P=P, infer=infer)
+
+
+def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=None , P=None, infer=None):
+
+
+    LS2 = 0
+    if start == None:
+        start = 0
+    if end == None:
+        end = len(input)
+
+    if P is None:
+        P = output
+
+    for i in range(start, end):
+
+        Xi =input[i]
+
+        LS1 = 0
+        for j, xij in enumerate(Xi):
+
+            #print(P[i][j])
+            probs=model.getProbs(paramMean[i], xij, paramVar[i], output[i][j], infer)
+            for k, p in enumerate(probs):
+                pReal=P[i][j][k]
+                LS1 -=  pReal* math.log(p)
+
+
+        LS2 += (LS1/(j+1))
+
+    return LS2 / (end - start)
 
 
 def naiveOpti(function, intervals):
@@ -120,7 +183,6 @@ def naiveOpti(function, intervals):
         values.append(function(comb))
 
     return combinations[values.index(min(values))]
-
 
 
 def goldenSearch(function, functionArgs, initIntervals, reduction=0.05):

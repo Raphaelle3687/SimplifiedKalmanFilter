@@ -20,6 +20,9 @@ class DataSet:
         self.syntheticOutput = None
         self.syntheticParameters = None
 
+    def copy(self):
+        return DataSet(np.array(self.input, copy=True),np.array(self.output, copy=True))
+
     def setCov(self, isCov):
 
         self.cov=isCov
@@ -30,11 +33,11 @@ class DataSet:
             self.parametersVar=np.zeros([dim[0], dim[1]])
 
 
-    def resetParam(self):
-        dimParam=[self.input.shape[0], self.input.shape[2]]
 
-        self.parametersMean=np.zeros(dimParam)
-        self.parametersVar=np.zeros(dimParam)
+    def resetParam(self):
+
+        self.parametersMean=np.zeros(self.parametersMean.shape)
+        self.parametersVar=np.zeros(self.parametersVar.shape)
 
 
     def getTrio(self, t):
@@ -91,4 +94,4 @@ class DataSet:
         if self.cov==True:
             self.parametersVar[0] = np.identity(self.parametersVar.shape[1])*var
         else:
-            self.parametersVar[0] = (np.zeros(len(self.parametersVar[0]))*+var)
+            self.parametersVar[0] = (np.zeros(len(self.parametersVar[0]))+var)

@@ -13,10 +13,12 @@ class KF:
 
         X=self.data.input
         Y=self.data.output
+        self.alpha=alpha
+        self.beta=beta
 
-        self.data.setVar0(self.model.scale)
         if self.data.cov==False:
             self.data.setCov(True)
+        self.data.setVar0(alpha)
 
         paramMean=self.data.parametersMean
         paramVar=self.data.parametersVar
@@ -28,24 +30,38 @@ class KF:
 
             theta_I = beta * paramMean[i]
             varC_I = beta ** 2 * paramVar[i] + (np.identity(paramVar[i].shape[0]) * alpha)
-
+            Vt=varC_I
             for j, xij in enumerate(Xi):
 
                 for k in range(0, iter):
 
                     gt=self.model.L1(theta_I, xij, Y[i][j], add=0)
                     ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                    VtINV=np.linalg.inv(varC_I)
                     A=np.matmul(xij.reshape(len(xij), 1), xij.reshape(1, len(xij)))
+                    VtINV = np.linalg.inv(Vt)
                     Vt=np.linalg.inv ( ht*A + VtINV )
-                    temp= xij*gt + xij*np.dot(ht*xij.transpose(), theta_I) + np.dot(VtINV, beta*paramMean[i])
-                    theta_I= np.dot(Vt, temp)
+                    temp= xij*gt + xij*np.dot(ht*xij.transpose(), theta_I) + np.dot(VtINV, theta_I)
+                    toAdd=np.matmul(Vt, temp)
+                    theta_I=toAdd
 
                 paramMean[i+1]=theta_I
 
-                ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                Vt = np.linalg.inv(ht * A + VtINV)
+                #ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
+                #Vt = np.linalg.inv(ht * A + VtINV)
                 paramVar[i + 1] = Vt
+
+    def microInfer(self, theta, V, x, y):
+        theta = self.beta * theta
+        V = self.beta ** 2 * V + (np.identity(V.shape[0]) * self.alpha)
+
+        gt = self.model.L1(theta, x, y)
+        ht = self.model.L2(theta, x,y)
+        VtINV = np.linalg.inv(V)
+        A = np.matmul(x.reshape(len(x), 1), x.reshape(1, len(x)))
+        Vt = np.linalg.inv(ht * A + VtINV)
+        temp = x * gt + x * np.dot(ht * x.transpose(), theta) + np.dot(VtINV, theta)
+        theta = np.matmul(Vt, temp)
+        return theta, Vt
 
 
 
