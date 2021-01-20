@@ -2,17 +2,18 @@ import numpy as np
 import numpy.random as rand
 class DataSet:
 
-    def __init__(self, input, output):
+    def __init__(self, input, output,dimX, dimY):
 
-        self.input=input#np array of np arrays x_t
+        self.input=input#array containing arrays of scheduling vectors, supports empty entries
         self.output=output#np array of y
         self.P=None
-        self.dim=output.shape[2]
+        self.dim=dimY
+        self.dimX=dimX
         self.cov=False
         if len(input)!=len(output):
             raise Exception("Length of the input and output should match")
 
-        dimParam=[self.input.shape[0], self.input.shape[2]]
+        dimParam=[len(self.input), dimX]
 
         self.parametersMean=np.zeros(dimParam)
         self.parametersVar=np.zeros(dimParam)
@@ -21,7 +22,7 @@ class DataSet:
         self.syntheticParameters = None
 
     def copy(self):
-        return DataSet(np.array(self.input, copy=True),np.array(self.output, copy=True))
+        return DataSet(np.array(self.input, copy=True),np.array(self.output, copy=True), self.dimX, self.dim)
 
     def setCov(self, isCov):
 

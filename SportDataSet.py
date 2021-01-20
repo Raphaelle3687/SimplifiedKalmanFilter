@@ -2,6 +2,7 @@ import pandas as pd
 import math
 import numpy as np
 from DataSet import DataSet
+from datetime import date
 class SportDataSet:
 
     def __init__(self, season, game):
@@ -23,13 +24,40 @@ class SportDataSet:
         self.dataFrame = pd.read_excel("NHL/nhl odds "+self.season+".xlsx")
         data = self.dataFrame
 
+        dbf=data["Date"]
+        dates=[]
+        years=self.season.split("-")
+        year=years[0]
+        for dat in dbf:
+            month=int(str(dat)[:-2])
+            day=int(str(dat)[-2:])
+            if month<7:
+                year=years[1]
+            dates.append(date(int(year), month, day))
+
+        firstDay=dates[0];
+        lastDay=dates[-1];
+        totalDays=(lastDay-firstDay).days+1
+        print(totalDays)
+
+
         for i in data["Team"]:
             if i not in self.playersToI.keys():
                 self.playersToI[i] = len(self.playersToI)
                 self.ItoPlayers[len(self.ItoPlayers)] = i
 
-        xData = np.zeros([int(len(data.index)/2),1 ,len(self.playersToI)])
-        yData = np.zeros([int(len(data.index)/2),1 ,2])
+
+        xData=[]
+        yData=[]
+        oddsData=[]
+
+        for i in range(totalDays):
+            xData.append([])
+            yData.append([])
+            oddsData.append([])
+
+        #xData = np.zeros([int(len(data.index)/2),1 ,len(self.playersToI)])
+        #yData = np.zeros([int(len(data.index)/2),1 ,2])
 
         for i in range(0, len(data), 2):
             name = "match#" + str((i + 1) - int((i + 1) / 2))
@@ -43,26 +71,49 @@ class SportDataSet:
             oddsA = data["Open"][i]
             oddsH = data["Open"][i + 1]
 
+            dat=data["Date"][i]
+            month=int(str(dat)[:-2])
+            day=int(str(dat)[-2:])
+            if month<8:
+                year=years[1]
+            else:
+                year=years[0]
+            matchDate=(date(int(year), month, day))
+            dayIndex=(matchDate-firstDay).days
+
             hI = self.playersToI[home];
             aI = self.playersToI[away]
 
-            index=(i) - int((i + 1) / 2)
+            #index=(i) - int((i + 1) / 2)
 
-            xData[index][0][hI] = 1;
-            xData[index][0][aI] = -1
+            xij=np.zeros(len(self.playersToI))
+            yij = np.zeros(2)
+            xij[hI]=1
+            xij[aI]=-1
+
+            #xData[index][0][hI] = 1;
+            #xData[index][0][aI] = -1
 
             if finalH>finalA:
-                yData[index][0][0] = 1
+                #yData[index][0][0] = 1
+                yij[0]=1
             else:
-                yData[index][0][1] = 1
+                #yData[index][0][1] = 1
+                yij[1]=1
 
             if finalH==finalA:
                 print("draw warning draw warning draw warning draw warning")
 
-            self.odds[i] = [oddsH, oddsA]
+            odds=[oddsH, oddsA]
+            #self.odds[i] = odds
             self.matches[name] = len(self.matches)
 
-        self.data = DataSet(xData, yData)
+            xData[dayIndex].append(xij)
+            yData[dayIndex].append(yij)
+            oddsData.append(odds)
+            self.odds=oddsData
+
+        self.data = DataSet(xData, yData, len(self.playersToI), 2)
 
 
     def buildF(self):

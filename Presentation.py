@@ -6,9 +6,112 @@ from Misc import *
 from SKF import SKF
 from KalmanFilter import KF
 from Elo import Elo
+from Trueskill import Trueskill
+from Glicko import Glicko
+import plotly.graph_objects as plotly
+import matplotlib.ticker as mticker
 
-def plotArgs(model, epsArgs, betArgs, mode, iter=1):
-    if mode=="NHL":
+def getColorGrad(scores, mode="max"):
+    minScore = min(scores)
+    maxScore = max(scores)
+    greenMin = 255
+    redMin = 0
+
+    sortedScores = scores.copy()
+    sortedScores.sort()
+
+    interval = int(255 / (len(scores)))
+
+    colors = []
+
+    if mode=="total":
+
+        for i in scores:
+            ind = sortedScores.index(i)
+            colors.append("rgb(" + str(redMin + interval * ind) + "," + str(greenMin - interval * ind) + ", 0)")
+    else:
+        for i in scores:
+            colors.append("w")
+    if mode=="max":
+        i = scores.index(minScore)
+        colors[i] = "g"
+
+    return colors
+
+
+def table(seasons, models, lsFunction):
+    head = ["Model"]
+
+    for i in seasons.keys():
+        head.append(i)
+
+    rowValues = []
+    colorRows = [["lightcyan"]]
+
+    column1 = ["Odds", "Empirical"]
+    # column1=[]
+
+    for name in models.keys():
+        column1.append(name)
+
+    rowValues.append(column1)
+
+    for season in seasons.keys():
+        data = seasons[season]
+
+        column = ["%.4f" % data.getLSOdds(int(data.nMatches() / 2)),
+                  "%.4f" % data.getEmpiricalLS(int(data.nMatches() / 2))]
+        # column=[]
+
+        for name in models.keys():
+            model = Model(data, models[name][0], models[name][1]);
+            solver = None;
+            value = 0
+            value = lsFunction(None, model)
+            # value=Presentation.computeMeanLS_SG(None, solver)
+            print(value)
+
+            column.append("%.4f" % value)
+        rowValues.append(column)
+        #colorRows.append(Presentation.getColorGrad(None, column))
+    print(rowValues)
+
+    fig = plotly.Figure(data=[plotly.Table(
+        header=dict(values=head,
+                    line_color='darkslategray',
+                    fill_color='lightskyblue',
+                    align='left'),
+        cells=dict(values=rowValues,  # 2nd column
+                   line_color='darkslategray',
+                   fill_color=colorRows,
+                   align='center'))
+    ])
+
+    fig.update_layout(width=800, height=800)
+    fig.show()
+
+def getNames(infer):
+
+    if isinstance(infer, SKF):
+        if infer.model.model=="BradleyTerry":
+            return "SKF-BT"
+        elif infer.model.model=="Thurstone":
+            return "SKF-T"
+    elif isinstance(infer, KF):
+        if infer.model.model == "BradleyTerry":
+            return "KF-BT"
+        elif infer.model.model == "Thurstone":
+            return "KF-T"
+    elif isinstance(infer, Elo):
+        return "Elo"
+    elif isinstance(infer, Glicko):
+        return "Glicko"
+    elif isinstance(infer, Trueskill):
+        return "Trueskill"
+
+
+def plotArgs(Infers, epsArgs, betArgs, var0Args, K,title, mode="", iter=1):
+    """if mode=="NHL":
         data=dataNHL
         K=K_H
     elif mode=="S1":
@@ -18,10 +121,10 @@ def plotArgs(model, epsArgs, betArgs, mode, iter=1):
         data=dataS2
         K=K_S2
     elif mode=="Gauss":
-        data=dataGauss
+        data=dataGauss"""
 
     colors=["c", "m", "y", "r", "g", "b"]
-
+    """
     inferSKF=[]
     inferKF=[]
 
@@ -34,12 +137,81 @@ def plotArgs(model, epsArgs, betArgs, mode, iter=1):
         for D in data:
             elo=Elo(D, model.scale)
             elo.infer(K, 0)
-            EloLS+=elo.getMeanLS(P=D.P)/len(data)
+            EloLS+=getLSOnInfer(elo, P=D.P)/len(data)"""
 
 
-        plt.plot(epsArgs, np.ones(len(epsArgs))*EloLS, "k", label="Elo")
+    def getLS(infers, eps, bet, var0):
+        temp=0
+        for inf in infers:
+            inf.data.resetParam()
+            if isinstance(inf, Elo):
+                inf.infer(K, bet, var0=var0)
+            else:
+                inf.infer(eps, bet, var0=var0)
+            temp+=getLSOnInfer(inf, P=inf.data.P, start=int(len(inf.data.input)/2))/len(infers)
+        return temp
 
-    def LSon5(params):
+    f = mticker.ScalarFormatter(useOffset=False, useMathText=True)
+    g = lambda x, pos: "${}$".format(f._formatSciNotation('%1.10e' % x))
+    fmt = mticker.FuncFormatter(g)
+
+    head=[]
+    rowValues=[]
+    colorRows = []
+    head.append("eps")
+    epsValues = [fmt(e) for e in epsArgs[0]]
+    rowValues.append(epsValues)
+    colorRows.append(getColorGrad(epsValues, mode="white"))
+
+    for i, infers in enumerate(Infers):
+
+        epsList=epsArgs[i]
+        betList=betArgs[i]
+        var0List=var0Args[i]
+
+        for var in var0List:
+            for beta in betList:
+                name = getNames(infers[0])
+                string=name +" V0:"+str("%.1f"%var)
+                #print(string)
+                head.append(string)
+                valLS=[]
+                for eps in epsList:
+                    valLS.append("%.5f" % getLS(infers, eps, beta, var))
+                    print(len(valLS))
+                rowValues.append(valLS)
+                print(valLS)
+                colorRows.append(getColorGrad(valLS))
+
+
+    """    fig = plotly.Figure(data=[plotly.Table(
+        header=dict(values=head,
+                    line_color='darkslategray',
+                    fill_color='lightskyblue',
+                    align='left'),
+        cells=dict(values=rowValues,  # 2nd column
+                    line_color='darkslategray',
+                    fill_color=colorRows,
+                    align='center'))
+        ])
+
+    fig.update_layout(width=1200, height=800)
+    fig.write_image(name+".png")"""
+
+    plt.figure(figsize=(15, 10))
+    t=plt.table(np.array(rowValues).transpose(),cellColours=np.array(colorRows).transpose(), loc="center", colLabels=head)
+    plt.axis("off")
+    t.auto_set_font_size(False)
+    t.set_fontsize(15)
+    t.scale(1.2, 2.2)
+    #plt.show()
+    plt.savefig(title+".png")
+    plt.clf()
+
+
+        #plt.plot(epsArgs, np.ones(len(epsArgs))*EloLS, "k", label="Elo")
+
+    """def LSon5(params):
         eps=params[0]
         bet=params[1]
         temp1=0; temp2=0
@@ -57,8 +229,8 @@ def plotArgs(model, epsArgs, betArgs, mode, iter=1):
             temp2+=getLSOnInfer(inf2, P=inf2.data.P)
 
         return temp1/len(inferSKF), temp2/len(inferKF)
-
-    for beta in betArgs:
+    """
+    """    for beta in betArgs:
         arraySKF = []
         arrayKF=[]
         for epsilon in epsArgs:
@@ -77,7 +249,7 @@ def plotArgs(model, epsArgs, betArgs, mode, iter=1):
     #plt.show()
     plt.savefig(mode+".png")
     plt.clf()
-
+"""
 
 
 def plotLS3D(function, xArgs, yArgs, scale):
@@ -129,7 +301,7 @@ def plotLS(data, ax, args, mode, iter=1):
     interval=args[0]
     if mode=="NHL":
         model = Model("BradleyTerry", 1)
-        epsilon = 5e-6
+        epsilon = 5e-5
         beta = 1
     else:
         model=Model("Thurstone", 1)
@@ -160,11 +332,11 @@ def plotLS(data, ax, args, mode, iter=1):
         for i in range(0, len(x)-1):
             yKF[i]+=(getLSOnInfer(KFs[j], start=x[i], end=x[i+1]))/len(data)
             ySKF[i]+=(getLSOnInfer(SKFs[j], start=x[i], end=x[i+1]))/len(data)
-            yELO[i]+=(ELOs[j].getMeanLS(start=x[i], end=x[i + 1]))/len(data)
+            yELO[i]+=(getLSOnInfer(ELOs[j], start=x[i], end=x[i + 1]))/len(data)
 
     ax.plot(x[1:], yKF, color=colors.pop(), label="KF")
     ax.plot(x[1:], ySKF, color=colors.pop(), label="SKF")
-    ax.plot(x[1:], yELO, color=colors.pop(), label="Elo")
+    #ax.plot(x[1:], yELO, color=colors.pop(), label="Elo")
 
     ax.set(ylabel="LS")
     ax.set_title("Mean LS over time intervals, data:"+mode)
@@ -210,7 +382,7 @@ def plotSkills(data, mode, ax):
         for i in range(0, len(x)-1):
             yKF[i]+=(getLSOnInfer(KFs[j], start=x[i], end=x[i+1]))/len(data)
             ySKF[i]+=(getLSOnInfer(SKFs[j], start=x[i], end=x[i+1]))/len(data)
-            yELO[i]+=(ELOs[j].getMeanLS(start=x[i], end=x[i + 1]))/len(data)
+            yELO[i]+=(getLSOnInfer(ELOs[j], start=x[i], end=x[i + 1]))/len(data)
 
     ax.plot(x[1:], yKF, color=colors.pop(), label="KF")
     ax.plot(x[1:], ySKF, color=colors.pop(), label="SKF")

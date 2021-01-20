@@ -9,16 +9,19 @@ class KF:
         if data.dim!=model.yDim:
             raise Exception("Dimension of the output of the model should match that of the data")
 
-    def infer(self, alpha, beta, iter=1):
+    def infer(self, alpha, beta, iter=1, var0=0):
 
         X=self.data.input
         Y=self.data.output
         self.alpha=alpha
         self.beta=beta
 
+        if var0==0:
+            var0=alpha
+
         if self.data.cov==False:
             self.data.setCov(True)
-        self.data.setVar0(alpha)
+        self.data.setVar0(var0)
 
         paramMean=self.data.parametersMean
         paramVar=self.data.parametersVar
@@ -39,16 +42,15 @@ class KF:
                     ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
                     A=np.matmul(xij.reshape(len(xij), 1), xij.reshape(1, len(xij)))
                     VtINV = np.linalg.inv(Vt)
-                    Vt=np.linalg.inv ( ht*A + VtINV )
                     temp= xij*gt + xij*np.dot(ht*xij.transpose(), theta_I) + np.dot(VtINV, theta_I)
                     toAdd=np.matmul(Vt, temp)
                     theta_I=toAdd
+                    Vt = np.linalg.inv(ht * A + VtINV)
 
-                paramMean[i+1]=theta_I
-
+            paramMean[i+1]=theta_I
+            paramVar[i + 1] = Vt
                 #ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
                 #Vt = np.linalg.inv(ht * A + VtINV)
-                paramVar[i + 1] = Vt
 
     def microInfer(self, theta, V, x, y):
         theta = self.beta * theta

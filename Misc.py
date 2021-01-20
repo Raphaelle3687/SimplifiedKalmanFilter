@@ -6,6 +6,9 @@ import random
 from DataSet import DataSet
 from SportDataSet import SportDataSet
 from scipy.stats import norm
+from Elo import Elo
+from Trueskill import Trueskill
+from Glicko import Glicko
 
 def randomWalk(beta, epsilon,N, D):
     skills=np.zeros([D, N])
@@ -43,7 +46,7 @@ def genSynthModel(M, D, alpha, beta, model=Model("Thurstone", 1)):
 
     indexA=np.arange(0, M).tolist()
 
-    skills=randomWalk(beta, alpha, D)
+    skills=randomWalk(beta, epsilon,M, D)
     X=np.zeros([D,int(M/2), M])
     Y=np.zeros([D,int(M/2), model.yDim])
     P=np.zeros([D,int(M/2), model.yDim])
@@ -85,7 +88,7 @@ def createSyntheticDataSet(alpha, beta, model, players=10, days=100, variant="")
         X, Y, P, skills = genSynthGaussian(players, days, alpha, beta, scale=model.scale)
     else:
         X, Y, P, skills = genSynthModel(players, days, alpha, beta, model=model)
-    data=DataSet(X, Y)
+    data=DataSet(X, Y, X.shape[2], Y.shape[2])
     data.P=P
     return data
 
@@ -103,22 +106,24 @@ dataGauss=[]
 mod=Model("Thurstone", 1)
 beta=0.98
 epsilon=(1-beta**2)
+for i in range(10):
+    #dataS1_K.append(createSyntheticDataSet(epsilon, beta, mod, players=6, days=200))
+    dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=24, days=200))
+
 for i in range(5):
     if False:
         dataNHL_K.append(SportDataSet(seasons_K[i], "H").data)
-        dataS1_K.append(createSyntheticDataSet(epsilon, beta, mod, players=12, days=200))
-        dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
-    if True:
+        #dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
+    if False:
         dataNHL.append(SportDataSet(seasons[i], "H").data)
         #dataS1.append(createSyntheticDataSet(epsilon, beta, mod, players=12, days=200))
         #dataS2.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
         #dataGauss.append(createSyntheticDataSet(epsilon, beta,mod, players=5, days=1000, variant="gaussian"))
 
-K_H=0.0081
+#K_H=0.0081
+K_H=0.0062
 K_S1=0.0850
 K_S2=0.0867
-
-
 
 
 def getLSOnInfer(infer, P=None, start=None, end=None):
@@ -129,10 +134,16 @@ def getLSOnInfer(infer, P=None, start=None, end=None):
     input=infer.data.input
     output=infer.data.output
 
-    return getMeanLS(input, output, paramM, infer.model, paramVar=paramV,start=start, end=end, P=P, infer=infer)
+    model=None
+    if isinstance(infer, Elo) or isinstance(infer, Trueskill) or isinstance(infer, Glicko):
+        model=infer
+    else:
+        model=infer.model
+
+    return getMeanLS(input, output, paramM,model, paramVar=paramV,start=start, end=end, P=P, infer=infer)
 
 
-def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=None , P=None, infer=None):
+def getMeanLS(input, output, paramMean, model, paramVar=None, start=None, end=None , P=None, infer=None):
 
 
     LS2 = 0
@@ -144,23 +155,27 @@ def getMeanLS(input, output, paramMean, model,paramVar=None, start=None, end=Non
     if P is None:
         P = output
 
+    realDays=0
+    count = 0
     for i in range(start, end):
-
         Xi =input[i]
+        if len(Xi)>0:
+            realDays+=1
 
         LS1 = 0
+        j=0
         for j, xij in enumerate(Xi):
-
-            #print(P[i][j])
-            probs=model.getProbs(paramMean[i], xij, paramVar[i], output[i][j], infer)
+            count+=1
+            probs=model.getProbs(paramMean[i], xij, paramVar[i], output[i][j])
             for k, p in enumerate(probs):
                 pReal=P[i][j][k]
                 LS1 -=  pReal* math.log(p)
 
+        #LS2 += (LS1/(j+1))
+        LS2+=LS1
 
-        LS2 += (LS1/(j+1))
-
-    return LS2 / (end - start)
+    #return LS2 / realDays
+    return LS2/count
 
 
 def naiveOpti(function, intervals):

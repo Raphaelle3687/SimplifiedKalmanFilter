@@ -17,7 +17,7 @@ class Elo:
         h=y[0]
         return (h-self.F(theta, x))/sigmaPrim
 
-    def infer(self, K, misc, iter=1):
+    def infer(self, K, misc, iter=1, var0=0):
         self.fit(K)
 
     def fit(self, K):
@@ -33,6 +33,10 @@ class Elo:
             for j, xij in enumerate(Xi):
                 grad=self.G(xij, prevMean, Y[i][j])
                 self.data.parametersMean[i+1]+=K*xij*grad
+
+    def getProbs(self, theta, x, V, d):
+        pW = self.F(theta, x)
+        return [pW, 1-pW]
 
     def getMeanLS(self, start=None, end=None, P=None):
         LS2 = 0

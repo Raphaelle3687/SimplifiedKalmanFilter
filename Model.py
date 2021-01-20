@@ -11,6 +11,7 @@ class Model:
         self.estimates=[]
         self.scale=scale
         self.mode=""
+        self.model=mod
         #self.Loss=None
         #self.LossOrd1=None
         #self.LossOrd2=None
@@ -107,7 +108,7 @@ class Model:
     def continuousEstimate(self, theta, x, V, d):
         pass
 
-    def getProbs(self, theta,x, V, d, infer):
+    def getProbs(self, theta,x, V, d):
         probs=[]
 
         if self.mode=="discrete":
@@ -115,7 +116,7 @@ class Model:
             if len(self.estimates)!=0:
 
                 for k, f in enumerate(self.estimates):
-                    probs.append(f(theta, x, V, infer))
+                    probs.append(f(theta, x, V))
 
             else:
                 for i in range(self.yDim):
@@ -290,22 +291,22 @@ class Thurstone:
         return self.FA(theta, x,add=var)
 
     def derLogFh(self, theta, x, add=0):
-        z = np.dot(theta, x) / math.sqrt((self.scale**2 + add))
-        return (norm.pdf(z)/norm.cdf(z))/(self.scale+add)
+        z = np.dot(theta, x) / math.sqrt((self.scale**2))
+        return (norm.pdf(z)/norm.cdf(z))/(self.scale)
 
     def derLogFa(self, theta, x, add=0):
-        z = np.dot(-theta, x) / math.sqrt((self.scale**2 + add))
-        return -(norm.pdf(z)/norm.cdf(z))/(self.scale+add)
+        z = np.dot(-theta, x) / math.sqrt((self.scale**2))
+        return -(norm.pdf(z)/norm.cdf(z))/(self.scale)
 
     def hessianH(self, theta, x, add=0):
-        z = np.dot(theta, x) / math.sqrt((self.scale**2 + add))
+        z = np.dot(theta, x) / math.sqrt((self.scale**2))
         val=(z*norm.pdf(z)*norm.cdf(z)+norm.pdf(z)**2)/(norm.cdf(z)**2)
-        return val/(self.scale+add)**2
+        return val/(self.scale)**2
 
     def hessianA(self, theta, x, add=0):
-        z = np.dot(-theta, x) / math.sqrt((self.scale**2 + add))
+        z = np.dot(-theta, x) / math.sqrt((self.scale**2))
         val=(z*norm.pdf(z)*norm.cdf(z)+norm.pdf(z)**2)/(norm.cdf(z)**2)
-        return val/(self.scale+add)**2
+        return val/(self.scale)**2
 
 class Gaussian:
     def __init__(self, scale):

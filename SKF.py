@@ -9,7 +9,7 @@ class SKF:
         if data.dim!=model.yDim:
             raise Exception("Dimension of the output of the model should match that of the data")
 
-    def infer(self, alpha, beta, iter=1):
+    def infer(self, alpha, beta, iter=1, var0=0):
         self.beta=beta
         self.alpha=alpha
         X=self.data.input
@@ -18,7 +18,10 @@ class SKF:
         if self.data.cov==True:
             self.data.setCov(False)
 
-        self.data.setVar0(alpha)
+        if var0==0:
+            var0=alpha
+
+        self.data.setVar0(var0)
 
         paramMean=self.data.parametersMean
         paramVar=self.data.parametersVar
@@ -30,10 +33,9 @@ class SKF:
 
             theta_I = beta * paramMean[i]
             var_I = (((beta**2)*paramVar[i]) + alpha)
-            varI=var_I
             for j, xij in enumerate(Xi):
 
-                u = (beta ** 2 * var_I + alpha) * xij #PROBLEM
+                u = (beta ** 2 * var_I + alpha) * xij
                 d = u * u
                 s = np.dot(u.transpose(), xij)
 
@@ -43,11 +45,11 @@ class SKF:
                     ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
                     theta_I=theta_I+(1/(1+ht*s))*u*gt
 
-                paramMean[i+1]=theta_I
+                ht = self.model.L2(theta_I, xij, Y[i][j], add=0)
+                var_I = var_I - (d * (ht) / (1 + ht * s))
 
-                ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                varI = varI - (d * (ht) / (1 + ht * s))
-                paramVar[i + 1] = varI
+            paramMean[i+1]=theta_I
+            paramVar[i + 1] = var_I
 
 
     def microInfer(self, theta, V, x, y):

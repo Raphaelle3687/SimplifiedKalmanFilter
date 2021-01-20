@@ -9,7 +9,11 @@ from Misc import *
 from Presentation import *
 from KalmanFilter import KF
 from Elo import Elo
+from datetime import date
+from Trueskill import Trueskill
 np.seterr("raise")
+import plotly
+from Glicko import Glicko
 
 def testK():
     data=SDS("2018-2019", "H")
@@ -84,24 +88,41 @@ def test3():
 
     X,Y,P,skills=genSynthModel(8, 1000, alpha, beta, model=model)
 
-    print(skills)
-    print(np.mean(skills, axis=0))
-    print(np.var(skills, axis=0))
+    #print(skills)
+    #print(np.mean(skills, axis=0))
+    #print(np.var(skills, axis=0))
 
     #print(getMeanLS(X, Y, skills,model, P=P))
 
-    data=DataSet(X, Y)
-    data.setVar0(alpha)
+    #data=DataSet(X, Y, 8, 2)
+    data=dataNHL[0]
+
     inf=SKF(data, model)
-    inf.infer(alpha, beta, iter=1)
-    #print(getLSOnInfer(inf, P=P))
-    #print(inf.data.parametersMean)
+    inf.infer(1.7e-4, 1)
+    print(getLSOnInfer(inf, P=data.P))
+    var = data.parametersVar[-1]
+    print(np.mean(var))
 
     inf2=KF(data, model)
     inf2.data.resetParam()
-    inf2.infer(alpha, beta, iter=1)
-    #print(getLSOnInfer(inf2, P=P))
-    #print(inf2.data.parametersMean)
+    inf2.infer(1.1e-4, 1)
+    print(getLSOnInfer(inf2, P=data.P))
+    var=data.parametersVar[-1]
+    var=np.diag(var)
+
+    inf3=Trueskill(data, 1)
+    inf3.data.resetParam()
+    inf3.infer(3.3e-4, 1)
+    print(getLSOnInfer(inf3, P=data.P))
+    var = data.parametersVar[-1]
+    print(np.mean(var))
+
+    inf4=Glicko(data, 1)
+    inf4.data.resetParam()
+    inf4.infer(1.5e-4, 1)
+    print(getLSOnInfer(inf4, P=data.P))
+    var = data.parametersVar[-1]
+    print(np.mean(var))
 
 def testElo():
     scale=1
@@ -155,7 +176,7 @@ def optiElo_K():
             for mod in models:
                 mod.data.resetParam()
                 mod.infer(K, 0)
-                temp+=mod.getMeanLS(P=mod.data.P)
+                temp+=getLSOnInfer(mod, start=int(len(mod.data.output)/2),P=mod.data.P)
             val=temp/len(models)
             print(K, val)
             return val
@@ -254,7 +275,7 @@ def plot():
     model = Model("Thurstone", scale)
     modelNHL=Model("BradleyTerry", scale)
     modelGauss=Model("Gaussian", 1)
-    epsRange1=np.arange(0.1,5.2, 1)/100000
+    epsRange1=np.arange(0.1, 10.2, 2)/10000
     betRange1 = [1]
     epsRange2=np.arange(0.1, 10.1, 1)/100
     betRange2=[0.95, 0.98, 1]
@@ -271,9 +292,142 @@ def plot():
 
 def plot2():
     fig, ax=plt.subplots()
-    plotLS(dataNHL, ax, [100], mode="NHL")
-    plt.show()
+    plotLS(dataNHL, ax, [20], mode="NHL")
+    #plt.show()
     plt.savefig("LSoverTimeNHL.png")
+
+
+def findVar(data,scale, eps1, bet1, eps2, bet2, eps3, bet3, eps4, bet4):
+
+    model = Model("BradleyTerry", scale)
+
+    inf=SKF(data, model)
+    inf.infer(eps1, bet1, var0=70)
+    print(getLSOnInfer(inf, P=data.P))
+    var = data.parametersVar[-1]
+    print(np.mean(var))
+
+    mean=data.parametersMean
+    y=np.var(mean,axis=1)
+    x=np.arange(0, len(y))
+    plt.plot(x, y)
+
+
+    inf2=KF(data, model)
+    inf2.data.resetParam()
+    inf2.infer(eps2, bet2, var0=130)
+    print(getLSOnInfer(inf2, P=data.P))
+    var=data.parametersVar[-1]
+    var=np.diag(var)
+    print(np.mean(var))
+
+    mean=data.parametersMean
+    y2=np.var(mean,axis=1)
+    plt.plot(x, y2)
+    plt.show()
+
+    inf3=Trueskill(data, scale)
+    inf3.data.resetParam()
+    inf3.infer(eps3, bet3)
+    print(getLSOnInfer(inf3, P=data.P))
+    var = data.parametersVar[-1]
+    print(np.mean(var))
+
+    inf4=Glicko(data, scale)
+    inf4.data.resetParam()
+    inf4.infer(eps4, bet4)
+    print(getLSOnInfer(inf4, P=data.P))
+    var = data.parametersVar[-1]
+    print(np.mean(var))
+
+
+def createInf(data, name, scale):
+    if name=="SKF-BT":
+        model=Model("BradleyTerry", scale)
+        return SKF(data, model)
+    elif name=="SKF-T":
+        model=Model("Thurstone", scale)
+        return SKF(data, model)
+    elif name=="KF-BT":
+        model=Model("BradleyTerry", scale)
+        return KF(data, model)
+    elif name=="KF-T":
+        model=Model("Thurstone", scale)
+        return KF(data, model)
+    elif name=="Elo":
+        return Elo(data, scale)
+    elif name=="Glicko":
+        return Glicko(data, scale)
+    elif name=="Trueskill":
+        return Trueskill(data, scale)
+
+def getInfers(data, list, scale):
+
+    Infers=[]
+
+    for name in list:
+        infers=[]
+        for D in data:
+            infers.append(createInf(D, name, scale))
+        Infers.append(infers)
+    return Infers
+
+
+def getTableLSEpsilon(data):
+
+    epsArgsH=np.arange(0.1, 4.2, 0.4)*100
+    betArgsH=[0.98]
+    var0H=[0]
+
+    scale=100
+    K=K_H*scale
+
+    #names= ["SKF","KF","Trueskill","Glicko", "Elo"]
+    names=["SKF-BT", "KF-BT", "Glicko"]
+    Infers=getInfers(data,names, scale)
+    epsArgs = []
+    betArgs=[]
+    varArgs=[]
+
+    for i in range(len(names)):
+        epsArgs.append(epsArgsH)
+        betArgs.append(betArgsH)
+        varArgs.append(var0H)
+
+    plotArgs(Infers, epsArgs, betArgs, varArgs, K, "TestS1")
+
+def getLSTableNHL():
+    scale=100
+    K=K_H*scale**2
+
+    #names= ["SKF","KF","Trueskill","Glicko", "Elo"]
+    names=["SKF-T","KF-T","Trueskill", "SKF-BT", "KF-BT", "Glicko", "Elo"]
+    Infers=getInfers(dataNHL,names, scale)
+    epsArgs = [[1.36], [1.04], [1.36], [0.72], [0.54], [0.72], [0]]
+    betArgs=[[1],[1],[1],[1],[1],[1],[1]]
+    varArgs=[[29], [24], [30], [15], [15], [15], [0]]
+    plotArgs(Infers, epsArgs, betArgs, varArgs, K, "LS_NHL_Opti")
+
+
+def getTableLSVar(data,eps,var,scale, name):
+
+    K=K_H*scale**2
+
+    epsValues=np.arange(0, 1.1, 0.2)
+    varValues=np.arange(0.1, 1.2, 0.2)
+
+
+    names= [name]
+    #names=["Trueskill", "Elo"]
+    Infers=getInfers(data,names, scale)
+    epsArgs = [epsValues*eps]
+    betArgs=[[1]]
+    varArgs=[varValues*var]
+
+    plotArgs(Infers, epsArgs, betArgs, varArgs, K, name)
+
+
+
 
 #optiOnHockey(iter=1)
 #testK()
@@ -283,5 +437,15 @@ def plot2():
 #testElo()
 #test()
 #optiElo_K()
-plot()
+#plot()
 #testGauss()
+#findVar(dataNHL_K[0], 100, 0.9, 1, 0.9, 1, 0.9, 1, 0.9, 1 )
+getTableLSEpsilon(dataS2_K)
+scale=100
+#getTableLSVar(dataNHL_K,0.9,150,scale, "SKF-BT")
+#getTableLSVar(dataNHL_K,0.9,150,scale, "KF-BT")
+#getTableLSVar(dataNHL_K,0.9,150,scale, "Glicko")
+#getTableLSVar(dataNHL_K,1.7,290,scale, "SKF-T")
+#getTableLSVar(dataNHL_K,1.3,240,scale, "KF-T")
+#getTableLSVar(dataNHL_K,1.7,300,scale, "Trueskill")
+#getLSTableNHL()
