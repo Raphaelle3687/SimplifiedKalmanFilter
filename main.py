@@ -7,32 +7,56 @@ import numpy.random as rand
 import random
 from Misc import *
 from Presentation import *
-from KalmanFilter import KF
+from KF import KF
+from KalmanFilter import KalmanFilter
 from Elo import Elo
 from datetime import date
 from Trueskill import Trueskill
 np.seterr("raise")
 import plotly
 from Glicko import Glicko
+#from scipy.special import roots_hermite
 
 def testK():
     data=SDS("2018-2019", "H")
     d=data.data
-    rk=Model("Thurstone", 1, args=[0.5])
-    alpha=20/600**2
+    #d=dataS1_K[0]
     beta=1
+    scale=100
+    #alpha = (1 - 0.98 ** 2) * scale
+    alpha=2
+    rk = Model("BradleyTerry", scale, args=[0.5])
+    iter=1
 
-    d.setVar0(alpha)
-    inf1 = KF(d, rk)
-    inf1.infer(alpha, beta, iter=1)
-    print(getLSOnInfer(inf1))
+    KF_old = KF(d.copy(), rk)
+    #KF_old.infer(alpha, beta, iter=iter)
+    #print(KF_old.data.parametersMean[1])
 
-    for m in range(len(d.parametersMean[-1])):
-        print(data.ItoPlayers[m])
-        print(d.parametersMean[-1][m])
+    KF_new=KalmanFilter(d.copy(), rk, "KF")
+    KF_new.infer(alpha, beta, iter=iter)
+    #print(KF_new.data.parametersVar[-1])
 
-    #print(d.parametersVar[100])
-    print(d.parametersVar[-1])
+    SKF_old=SKF(d.copy(), rk)
+    #SKF_old.infer(alpha, beta, iter=iter)
+    #print(SKF_old.data.parametersVar[1])
+
+    SKF_new=KalmanFilter(d.copy(), rk, "v-SKF")
+    SKF_new.infer(alpha, beta, iter=iter)
+    #print(SKF_new.data.parametersVar[1])
+
+    SSKF=KalmanFilter(d.copy(), rk, "s-SKF")
+    SSKF.infer(alpha, beta, iter=iter)
+    #print(SSKF.data.parametersVar[-1])
+
+    fSKF=KalmanFilter(d.copy(), rk, "f-SKF")
+    fSKF.infer(alpha, beta, var0=120, iter=iter)
+
+    #print(getLSOnInfer(KF_old))
+    print(getLSOnInfer(KF_new))
+    #print(getLSOnInfer(SKF_old))
+    print(getLSOnInfer(SKF_new))
+    print(getLSOnInfer(SSKF))
+    print(getLSOnInfer(fSKF))
 
 def test():
     data=SDS("2015-2016", "H")
@@ -342,18 +366,24 @@ def findVar(data,scale, eps1, bet1, eps2, bet2, eps3, bet3, eps4, bet4):
 
 
 def createInf(data, name, scale):
-    if name=="SKF-BT":
+    if name=="v-SKF-BT":
         model=Model("BradleyTerry", scale)
-        return SKF(data, model)
-    elif name=="SKF-T":
+        return KalmanFilter(data, model, "v-SKF")
+    elif name=="v-SKF-T":
         model=Model("Thurstone", scale)
-        return SKF(data, model)
+        return KalmanFilter(data, model, "v-SKF")
     elif name=="KF-BT":
         model=Model("BradleyTerry", scale)
-        return KF(data, model)
+        return KalmanFilter(data, model, "KF")
     elif name=="KF-T":
         model=Model("Thurstone", scale)
-        return KF(data, model)
+        return KalmanFilter(data, model, "KF")
+    elif name=="s-SKF-BT":
+        model=Model("BradleyTerry", scale)
+        return KalmanFilter(data, model, "s-SKF")
+    elif name=="s-SKF-T":
+        model=Model("Thurstone", scale)
+        return KalmanFilter(data, model, "s-SKF")
     elif name=="Elo":
         return Elo(data, scale)
     elif name=="Glicko":
@@ -375,15 +405,16 @@ def getInfers(data, list, scale):
 
 def getTableLSEpsilon(data):
 
-    epsArgsH=np.arange(0.1, 4.2, 0.4)*100
+
+    scale=100
+    K=K_H*scale**2
+
+    epsArgsH=np.arange(0.01, 0.07, 0.005)*scale**2
     betArgsH=[0.98]
     var0H=[0]
 
-    scale=100
-    K=K_H*scale
-
     #names= ["SKF","KF","Trueskill","Glicko", "Elo"]
-    names=["SKF-BT", "KF-BT", "Glicko"]
+    names=["SSKF-T","SKF-T","KF-T","Trueskill","SSKF-BT","SKF-BT", "KF-BT", "Glicko"]
     Infers=getInfers(data,names, scale)
     epsArgs = []
     betArgs=[]
@@ -394,7 +425,7 @@ def getTableLSEpsilon(data):
         betArgs.append(betArgsH)
         varArgs.append(var0H)
 
-    plotArgs(Infers, epsArgs, betArgs, varArgs, K, "TestS1")
+    plotArgs(Infers, epsArgs, betArgs, varArgs, K, "LS_S2_E98Correct")
 
 def getLSTableNHL():
     scale=100
@@ -430,7 +461,7 @@ def getTableLSVar(data,eps,var,scale, name):
 
 
 #optiOnHockey(iter=1)
-#testK()
+testK()
 #optiOn5()
 #plot2()
 #test3()
@@ -440,7 +471,7 @@ def getTableLSVar(data,eps,var,scale, name):
 #plot()
 #testGauss()
 #findVar(dataNHL_K[0], 100, 0.9, 1, 0.9, 1, 0.9, 1, 0.9, 1 )
-getTableLSEpsilon(dataS2_K)
+#getTableLSEpsilon(dataS2_K)
 scale=100
 #getTableLSVar(dataNHL_K,0.9,150,scale, "SKF-BT")
 #getTableLSVar(dataNHL_K,0.9,150,scale, "KF-BT")
@@ -449,3 +480,4 @@ scale=100
 #getTableLSVar(dataNHL_K,1.3,240,scale, "KF-T")
 #getTableLSVar(dataNHL_K,1.7,300,scale, "Trueskill")
 #getLSTableNHL()
+

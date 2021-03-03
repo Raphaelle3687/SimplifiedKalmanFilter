@@ -13,6 +13,7 @@ from Glicko import Glicko
 def randomWalk(beta, epsilon,N, D):
     skills=np.zeros([D, N])
     I=np.identity(skills.shape[1])
+    COV=rand.random(I.shape)
     covMat=I*epsilon
     skills[0]=rand.multivariate_normal(skills[0], covMat)
 
@@ -106,14 +107,15 @@ dataGauss=[]
 mod=Model("Thurstone", 1)
 beta=0.98
 epsilon=(1-beta**2)
-for i in range(10):
-    #dataS1_K.append(createSyntheticDataSet(epsilon, beta, mod, players=6, days=200))
-    dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=24, days=200))
+for i in range(30):
+    if False:
+        dataS1_K.append(createSyntheticDataSet(epsilon, beta, mod, players=4, days=200))
+        dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=30, days=200))
 
 for i in range(5):
     if False:
         dataNHL_K.append(SportDataSet(seasons_K[i], "H").data)
-        #dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
+        dataS2_K.append(createSyntheticDataSet(epsilon, beta, mod, players=60, days=200))
     if False:
         dataNHL.append(SportDataSet(seasons[i], "H").data)
         #dataS1.append(createSyntheticDataSet(epsilon, beta, mod, players=12, days=200))

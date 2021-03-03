@@ -35,7 +35,7 @@ class SKF:
             var_I = (((beta**2)*paramVar[i]) + alpha)
             for j, xij in enumerate(Xi):
 
-                u = (beta ** 2 * var_I + alpha) * xij
+                u = (var_I) * xij
                 d = u * u
                 s = np.dot(u.transpose(), xij)
 

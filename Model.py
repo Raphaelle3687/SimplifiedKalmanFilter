@@ -2,6 +2,7 @@ import numpy as np
 import math
 from scipy.stats import norm
 from scipy.integrate import quad
+from scipy.special import roots_hermite
 class Model:
     def __init__(self, mod, scale, args=None):
         self.yDim=None
@@ -91,7 +92,7 @@ class Model:
         return val
 
     #y here simply means for which outcome the probability is estimated
-    def discreteEstimate(self, theta, x, V, y):
+    def discreteEstimate2(self, theta, x, V, y):
 
         L=self.yFunctions[y](theta, x)
         g=self.yFunctionsOrd1[y](theta, x)
@@ -103,6 +104,20 @@ class Model:
 
         prob= np.exp( (g**2 *var)/(2*(h*var+1)) )* L/(np.sqrt(var*h+1))
         return prob
+
+    def discreteEstimate(self, theta, x, V, y):
+        L=self.yFunctions[y]
+        var = np.linalg.multi_dot([x.transpose(), V, x])
+        n=20
+        [root, weights]=roots_hermite(n)
+        estimate=0;
+        for i, r in enumerate(root):
+            thet=np.append(theta, np.sqrt(2*var)*r)
+            sched=np.append(x, 1)
+            estimate+=weights[i]*L(thet, sched)
+        estimate*=1/np.sqrt(np.pi)
+        return estimate
+
 
     #here d is the observation, in the continuous case the probability depends on it
     def continuousEstimate(self, theta, x, V, d):

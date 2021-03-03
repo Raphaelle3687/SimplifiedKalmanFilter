@@ -1,11 +1,12 @@
 import numpy as np
 from scipy.stats import norm
 import math
-class KF:
-    def __init__(self, data, model):
+class KalmanFilter:
+    def __init__(self, data, model, mode): #KF, v-SKF, s-SKF, f-SKF
         self.data=data
         self.model=model
         self.data.setCov(True)
+        self.mode=mode
         if data.dim!=model.yDim:
             raise Exception("Dimension of the output of the model should match that of the data")
 
@@ -18,6 +19,8 @@ class KF:
 
         if var0==0:
             var0=alpha
+            if self.mode=="f-SKF":
+                print("YOU SHOULD PROVIDE A VALID VARIANCE")
 
         if self.data.cov==False:
             self.data.setCov(True)
@@ -31,26 +34,49 @@ class KF:
             if i+1==len(X):
                 continue
 
-            theta_I = beta * paramMean[i]
-            varC_I = beta ** 2 * paramVar[i] + (np.identity(paramVar[i].shape[0]) * alpha)
-            Vt=varC_I
+            thetPrev = beta * paramMean[i]
+            thetaI=thetPrev
+            if self.mode=="f-SKF":
+                Vt=paramVar[i]
+            else:
+                varC_I = beta ** 2 * paramVar[i] + (np.identity(paramVar[i].shape[0]) * alpha)
+                Vt = varC_I
+
             for j, xij in enumerate(Xi):
 
+                var=np.linalg.multi_dot([xij.transpose(), Vt, xij])
+                gt = self.model.L1(thetaI, xij, Y[i][j], add=0)
+                ht = self.model.L2(thetaI, xij, Y[i][j], add=0)
+
                 for k in range(0, iter):
+                    #+ht*(np.dot(xij, (thetaI-thetPrev)))
 
-                    gt=self.model.L1(theta_I, xij, Y[i][j], add=0)
-                    ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                    A=np.matmul(xij.reshape(len(xij), 1), xij.reshape(1, len(xij)))
-                    VtINV = np.linalg.inv(Vt)
-                    temp= xij*gt + xij*np.dot(ht*xij.transpose(), theta_I) + np.dot(VtINV, theta_I)
-                    toAdd=np.matmul(Vt, temp)
-                    theta_I=toAdd
-                    Vt = np.linalg.inv(ht * A + VtINV)
+                    coeff=(gt)/(1+ht*var)
+                    toAdd = thetaI + np.matmul(Vt, xij) * coeff
 
-            paramMean[i+1]=theta_I
-            paramVar[i + 1] = Vt
-                #ht=self.model.L2(theta_I, xij, Y[i][j], add=0)
-                #Vt = np.linalg.inv(ht * A + VtINV)
+                    thetaI=toAdd
+
+                if self.mode!="f-SKF":
+                    ht = self.model.L2(thetaI, xij, Y[i][j], add=0)
+
+                    A=(Vt@xij).reshape(len(xij), 1)
+                    B=(xij.reshape(1, len(xij))@Vt)
+                    matrix=A@B
+
+                    Vt = Vt-(matrix)*(ht)/(1+ht*var)
+
+            paramMean[i+1]=thetaI
+
+            if self.mode=="KF":
+                paramVar[i + 1] = Vt
+            elif self.mode=="v-SKF":
+                paramVar[i+1]=np.identity(len(Vt))*Vt
+            elif self.mode=="s-SKF":
+                paramVar[i+1]=np.identity(len(Vt))*np.mean(np.diag(Vt))
+            elif self.mode=="f-SKF":
+                paramVar[i+1]=paramVar[i]
+
+
 
     def microInfer(self, theta, V, x, y):
         theta = self.beta * theta

@@ -4,12 +4,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 from Misc import *
 from SKF import SKF
-from KalmanFilter import KF
+from KF import KF
 from Elo import Elo
 from Trueskill import Trueskill
 from Glicko import Glicko
 import plotly.graph_objects as plotly
 import matplotlib.ticker as mticker
+from KalmanFilter import KalmanFilter
 
 def getColorGrad(scores, mode="max"):
     minScore = min(scores)
@@ -92,16 +93,18 @@ def table(seasons, models, lsFunction):
 
 def getNames(infer):
 
-    if isinstance(infer, SKF):
+    if isinstance(infer, KalmanFilter):
+        if infer.mode=="KF":
+            name="KF"
+        elif infer.mode=="SKF":
+            name="SKF"
+        elif infer.mode=="SSKF":
+            name="SSKF"
         if infer.model.model=="BradleyTerry":
-            return "SKF-BT"
+            return name+"-BT"
         elif infer.model.model=="Thurstone":
-            return "SKF-T"
-    elif isinstance(infer, KF):
-        if infer.model.model == "BradleyTerry":
-            return "KF-BT"
-        elif infer.model.model == "Thurstone":
-            return "KF-T"
+            return name+"-T"
+
     elif isinstance(infer, Elo):
         return "Elo"
     elif isinstance(infer, Glicko):
