@@ -1,8 +1,10 @@
 import numpy as np
 import math
-from scipy.stats import norm
+#from scipy.stats import norm
 from scipy.integrate import quad
 from scipy.special import roots_hermite
+from scipy.stats._continuous_distns import _norm_pdf as pdf
+from scipy.stats._continuous_distns import _norm_cdf as cdf
 class Model:
     def __init__(self, mod, scale, args=None):
         self.yDim=None
@@ -123,10 +125,17 @@ class Model:
     def continuousEstimate(self, theta, x, V, d):
         pass
 
-    def getProbs(self, theta,x, V, d):
+    def getProbs(self, theta,x, V, d, isy=True):
+
         probs=[]
 
         if self.mode=="discrete":
+
+            if isy==True:
+                for i in range(self.yDim):
+                    probs.append(self.yFunctions[i](theta, x))
+                return probs
+
 
             if len(self.estimates)!=0:
 
@@ -286,11 +295,11 @@ class Thurstone:
 
     def FH(self, theta, x, add=0):
         z = np.dot(theta, x) / math.sqrt((self.scale**2 + add))
-        return norm.cdf(z)
+        return cdf(z)
 
     def FA(self, theta, x, add=0):
         z = np.dot(-theta, x) / math.sqrt((self.scale**2 + add))
-        return norm.cdf(z)
+        return cdf(z)
 
     def estimatePH(self, theta, x, V):
         if V.ndim==1:
@@ -307,20 +316,20 @@ class Thurstone:
 
     def derLogFh(self, theta, x, add=0):
         z = np.dot(theta, x) / math.sqrt((self.scale**2))
-        return (norm.pdf(z)/norm.cdf(z))/(self.scale)
+        return (pdf(z)/cdf(z))/(self.scale)
 
     def derLogFa(self, theta, x, add=0):
         z = np.dot(-theta, x) / math.sqrt((self.scale**2))
-        return -(norm.pdf(z)/norm.cdf(z))/(self.scale)
+        return -(pdf(z)/cdf(z))/(self.scale)
 
     def hessianH(self, theta, x, add=0):
         z = np.dot(theta, x) / math.sqrt((self.scale**2))
-        val=(z*norm.pdf(z)*norm.cdf(z)+norm.pdf(z)**2)/(norm.cdf(z)**2)
+        val=(z*pdf(z)*cdf(z)+pdf(z)**2)/(cdf(z)**2)
         return val/(self.scale)**2
 
     def hessianA(self, theta, x, add=0):
         z = np.dot(-theta, x) / math.sqrt((self.scale**2))
-        val=(z*norm.pdf(z)*norm.cdf(z)+norm.pdf(z)**2)/(norm.cdf(z)**2)
+        val=(z*pdf(z)*cdf(z)+pdf(z)**2)/(cdf(z)**2)
         return val/(self.scale)**2
 
 class Gaussian:
@@ -330,7 +339,7 @@ class Gaussian:
 
     def P(self, theta, x, y):
         z=np.dot(theta, x)
-        return norm.pdf((z-y)/self.scale)
+        return pdf((z-y)/self.scale)
 
     def estimateP(self, theta, x, V, y):
         if V.ndim==1:
@@ -339,7 +348,7 @@ class Gaussian:
         realVar=var+self.scale**2
         mean=np.dot(theta, x)
         #z=(y-mean)/np.sqrt(realVar)
-        return norm.pdf(y, loc=mean, scale=np.sqrt(realVar))
+        return pdf(y, loc=mean, scale=np.sqrt(realVar))
 
 
     def derLogP(self, theta, x, y):

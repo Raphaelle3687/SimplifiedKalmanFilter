@@ -5,24 +5,60 @@ from Model import Model
 import random
 from DataSet import DataSet
 from SportDataSet import SportDataSet
-from scipy.stats import norm
 from Elo import Elo
 from Trueskill import Trueskill
 from Glicko import Glicko
 
-def randomWalk(beta, epsilon,N, D):
+def randomWalk(beta, epsilon,N, D, replacement=["rand", 50]):
+
+    replace=False
+    when=None
+    if len(replacement)>0:
+        replace=True
+        toReplace=replacement[0]
+        when=replacement[1]
+
     skills=np.zeros([D, N])
     I=np.identity(skills.shape[1])
-    COV=rand.random(I.shape)
+    #COV=rand.random(I.shape)
+
     covMat=I*epsilon
-    skills[0]=rand.multivariate_normal(skills[0], covMat)
+
+    skills[0]=rand.multivariate_normal(skills[0], I)
+
+    indexes=[]
 
     for i in range(D):
         if i==0:
             continue
         skills[i] = rand.multivariate_normal(beta * skills[i - 1], covMat)
 
-    return skills
+        if replace==True and i==when:
+
+            if toReplace=="top":
+
+                med=np.quantile(skills[i], 0.5)
+                indexes=np.where(skills[i]>med)[0]
+                for j in indexes:
+                    skills[i][j]=rand.normal(0, 1)
+
+            elif toReplace=="bottom":
+                med = np.quantile(skills[i], 0.5)
+                indexes = np.where(skills[i] < med)[0]
+                for j in indexes:
+                    skills[i][j]=rand.normal(0, 1)
+            else:
+                n=int(N/2)
+                indexA=np.arange(0, N).tolist()
+                newSchedule = random.sample(indexA, len(indexA))
+                for j in range(n):
+                    skills[i][newSchedule[j]]=rand.normal(0, 1)
+                indexes=newSchedule[:n]
+
+    if replace==True:
+        return skills, [when, indexes]
+    else:
+        return skills, []
 
 def genSynthGaussian(N, D, epsilon, beta, scale=1):
     skills=randomWalk(beta, epsilon, N, D)
@@ -43,11 +79,11 @@ def genSynthGaussian(N, D, epsilon, beta, scale=1):
 
     return X,Y,P,skills
 
-def genSynthModel(M, D, alpha, beta, model=Model("Thurstone", 1)):
+def genSynthModel(M, D, epsilon, beta, model=Model("Thurstone", 1), replacement=[]):
 
     indexA=np.arange(0, M).tolist()
 
-    skills=randomWalk(beta, epsilon,M, D)
+    skills, indexes=randomWalk(beta, epsilon,M, D, replacement=replacement)
     X=np.zeros([D,int(M/2), M])
     Y=np.zeros([D,int(M/2), model.yDim])
     P=np.zeros([D,int(M/2), model.yDim])
@@ -72,7 +108,7 @@ def genSynthModel(M, D, alpha, beta, model=Model("Thurstone", 1)):
             P[i][j]=pij
             Y[i][j]=yij
 
-    return X,Y,P,skills
+    return X,Y,P,skills, indexes
 
 
 def biasedDice(bias):
@@ -84,14 +120,14 @@ def biasedDice(bias):
         else:
             sum+=val
 
-def createSyntheticDataSet(alpha, beta, model, players=10, days=100, variant=""):
+def createSyntheticDataSet(alpha, beta, model, players=10, days=100, variant="", replacement=[]):
     if variant=="gaussian":
         X, Y, P, skills = genSynthGaussian(players, days, alpha, beta, scale=model.scale)
     else:
-        X, Y, P, skills = genSynthModel(players, days, alpha, beta, model=model)
+        X, Y, P, skills, indexes = genSynthModel(players, days, alpha, beta, model=model, replacement=replacement)
     data=DataSet(X, Y, X.shape[2], Y.shape[2])
     data.P=P
-    return data
+    return data, indexes
 
 seasons_K=["2007-2008", "2008-2009", "2009-2010", "2010-2011", "2011-2012"]
 dataNHL_K=[]
@@ -132,20 +168,25 @@ def getLSOnInfer(infer, P=None, start=None, end=None):
 
     paramM=infer.data.parametersMean
     paramV=infer.data.parametersVar
-    #paramV=None
     input=infer.data.input
     output=infer.data.output
 
+    beta=1
     model=None
     if isinstance(infer, Elo) or isinstance(infer, Trueskill) or isinstance(infer, Glicko):
         model=infer
+        if not isinstance(infer, Elo):
+            beta=model.beta
     else:
         model=infer.model
+        beta=infer.beta
 
-    return getMeanLS(input, output, paramM,model, paramVar=paramV,start=start, end=end, P=P, infer=infer)
 
 
-def getMeanLS(input, output, paramMean, model, paramVar=None, start=None, end=None , P=None, infer=None):
+    return getMeanLS(input, output, paramM,model, paramVar=paramV,start=start, end=end, P=P, beta=beta)
+
+
+def getMeanLS(input, output, paramMean, model, paramVar=None, start=None, end=None , P=None, beta=1):
 
 
     LS2 = 0
@@ -165,15 +206,14 @@ def getMeanLS(input, output, paramMean, model, paramVar=None, start=None, end=No
             realDays+=1
 
         LS1 = 0
-        j=0
         for j, xij in enumerate(Xi):
             count+=1
-            probs=model.getProbs(paramMean[i], xij, paramVar[i], output[i][j])
+            param=paramMean[i]*beta
+            probs=model.getProbs(param, xij, paramVar[i], output[i][j])
             for k, p in enumerate(probs):
                 pReal=P[i][j][k]
                 LS1 -=  pReal* math.log(p)
 
-        #LS2 += (LS1/(j+1))
         LS2+=LS1
 
     #return LS2 / realDays

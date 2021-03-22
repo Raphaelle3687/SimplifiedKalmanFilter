@@ -17,22 +17,49 @@ class Elo:
         h=y[0]
         return (h-self.F(theta, x))/sigmaPrim
 
-    def infer(self, K, misc, iter=1, var0=0):
-        self.fit(K)
+    def infer(self, eps, bet, iter=1, var0=0, switchIndex=[]):
+        K=var0
+        return self.fit(K, switchIndex=switchIndex)
 
-    def fit(self, K):
+    def fit(self, K, switchIndex=[]):
+
+        switch=False
+        if len(switchIndex)>0:
+            switch=True
+            when=switchIndex[0]
+            switchIndex=switchIndex[1]
 
         X=self.data.input
         Y=self.data.output
 
+        self.probs = np.zeros(Y.shape)
+
         for i, Xi in enumerate(X):
+
+            prevMean = self.data.parametersMean[i]
+
+            if switch == True and i == when:
+
+                for j in switchIndex:
+                    prevMean[j]=0;
+
+
+            #grad=np.zeros(len(Xi))
+
+            for j, xij in enumerate(Xi):
+
+                self.probs[i, j] = self.getProbs(prevMean, xij, None, Y[i][j])
+
+                grad=self.G(xij, prevMean, Y[i][j])
+                prevMean += K * xij * grad
+
             if i+1==len(X):
                 break
-            prevMean = self.data.parametersMean[i]
-            self.data.parametersMean[i + 1]=prevMean
-            for j, xij in enumerate(Xi):
-                grad=self.G(xij, prevMean, Y[i][j])
-                self.data.parametersMean[i+1]+=K*xij*grad
+            else:
+                self.data.parametersMean[i + 1] = prevMean
+
+
+        return self.probs
 
     def getProbs(self, theta, x, V, d):
         pW = self.F(theta, x)

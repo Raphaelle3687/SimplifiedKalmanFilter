@@ -294,6 +294,7 @@ def plotLS3D(function, xArgs, yArgs, scale):
     ax.set_ylabel('beta')
     ax.set_title("sigma: "+str(scale))
     plt.show()
+    return {"e":V[minIndex[0]][minIndex[1]], "b":S[minIndex[0]][minIndex[1]]}
 
 
 

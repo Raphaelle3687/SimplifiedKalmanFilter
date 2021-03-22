@@ -4,185 +4,23 @@ from SKF import SKF
 from DataSet import DataSet
 import numpy as np
 import numpy.random as rand
-import random
 from Misc import *
+from raiting_algorithms import *
+import pandas as pd
 from Presentation import *
 from KF import KF
 from KalmanFilter import KalmanFilter
 from Elo import Elo
-from datetime import date
 from Trueskill import Trueskill
 np.seterr("raise")
-import plotly
+from time import time
 from Glicko import Glicko
-#from scipy.special import roots_hermite
-
-def testK():
-    data=SDS("2018-2019", "H")
-    d=data.data
-    #d=dataS1_K[0]
-    beta=1
-    scale=100
-    #alpha = (1 - 0.98 ** 2) * scale
-    alpha=2
-    rk = Model("BradleyTerry", scale, args=[0.5])
-    iter=1
-
-    KF_old = KF(d.copy(), rk)
-    #KF_old.infer(alpha, beta, iter=iter)
-    #print(KF_old.data.parametersMean[1])
-
-    KF_new=KalmanFilter(d.copy(), rk, "KF")
-    KF_new.infer(alpha, beta, iter=iter)
-    #print(KF_new.data.parametersVar[-1])
-
-    SKF_old=SKF(d.copy(), rk)
-    #SKF_old.infer(alpha, beta, iter=iter)
-    #print(SKF_old.data.parametersVar[1])
-
-    SKF_new=KalmanFilter(d.copy(), rk, "v-SKF")
-    SKF_new.infer(alpha, beta, iter=iter)
-    #print(SKF_new.data.parametersVar[1])
-
-    SSKF=KalmanFilter(d.copy(), rk, "s-SKF")
-    SSKF.infer(alpha, beta, iter=iter)
-    #print(SSKF.data.parametersVar[-1])
-
-    fSKF=KalmanFilter(d.copy(), rk, "f-SKF")
-    fSKF.infer(alpha, beta, var0=120, iter=iter)
-
-    #print(getLSOnInfer(KF_old))
-    print(getLSOnInfer(KF_new))
-    #print(getLSOnInfer(SKF_old))
-    print(getLSOnInfer(SKF_new))
-    print(getLSOnInfer(SSKF))
-    print(getLSOnInfer(fSKF))
-
-def test():
-    data=SDS("2015-2016", "H")
-    d=data.data
-    rk=Model("Thurstone", 600, args=[0.5])
-    alpha=20
-    beta=0.9994
-
-    inf1 = SKF(d, rk)
-    inf1.infer(alpha, beta, iter=1)
-    print(getLSOnInfer(inf1))
-
-    d.resetParam()
-
-    elo=Elo(d, 600)
-    elo.infer(3000)
-    print(elo.getMeanLS())
-
-    for m in range(len(d.parametersMean[-1])):
-        print(data.ItoPlayers[m])
-        print(d.parametersMean[-1][m])
-
-def test2D():
-    data = SDS("2018-2019", "H")
-    d = data.data
-    rk = Model("RaoKupperGaussian", 600)
-    alpha = 60
-    beta = 1
-    dSynth = d.generateSynthetic(alpha, rk)
-    # d.output=dSynth.output
-
-    infSynth = SKF(dSynth, rk)
-    print(infSynth.getMeanLS())
-
-    dSynthToInfer = DataSet(dSynth.input, dSynth.output)
-    dSynthToInfer.setVar0(1)
-    infSynth2 = SKF(dSynthToInfer, rk)
-    infSynth2.infer(beta, alpha, iter=1)
-    print(infSynth2.getMeanLS())
-
-    for m in range(len(d.parametersMean[-1])):
-        print(data.ItoPlayers[m])
-        print(dSynthToInfer.parametersMean[-1][m], dSynth.parametersMean[-1][m])
-
-
-def test3():
-
-    scale=1
-    beta=0.98
-    alpha=1-beta**2
-
-    model = Model("BradleyTerry", scale)
-
-    X,Y,P,skills=genSynthModel(8, 1000, alpha, beta, model=model)
-
-    #print(skills)
-    #print(np.mean(skills, axis=0))
-    #print(np.var(skills, axis=0))
-
-    #print(getMeanLS(X, Y, skills,model, P=P))
-
-    #data=DataSet(X, Y, 8, 2)
-    data=dataNHL[0]
-
-    inf=SKF(data, model)
-    inf.infer(1.7e-4, 1)
-    print(getLSOnInfer(inf, P=data.P))
-    var = data.parametersVar[-1]
-    print(np.mean(var))
-
-    inf2=KF(data, model)
-    inf2.data.resetParam()
-    inf2.infer(1.1e-4, 1)
-    print(getLSOnInfer(inf2, P=data.P))
-    var=data.parametersVar[-1]
-    var=np.diag(var)
-
-    inf3=Trueskill(data, 1)
-    inf3.data.resetParam()
-    inf3.infer(3.3e-4, 1)
-    print(getLSOnInfer(inf3, P=data.P))
-    var = data.parametersVar[-1]
-    print(np.mean(var))
-
-    inf4=Glicko(data, 1)
-    inf4.data.resetParam()
-    inf4.infer(1.5e-4, 1)
-    print(getLSOnInfer(inf4, P=data.P))
-    var = data.parametersVar[-1]
-    print(np.mean(var))
-
-def testElo():
-    scale=1
-    beta=0.99
-    alpha=1-beta**2
-
-    model = Model("Thurstone", scale)
-
-    X,Y,P,skills=genSynthModel(10, 100, alpha, beta, model=model)
-    print(getMeanLS(X, Y, skills,model, P=P))
-
-    data=DataSet(X, Y)
-    inf=Elo(data, scale)
-    inf.infer(5e-2)
-    print(inf.getMeanLS(P=P))
-
-def testGauss():
-
-    scale=1
-    beta=0.98
-    alpha=1-beta**2
-
-    model = Model("Thurstone", scale)
-
-    X, Y, P, skills=genSynthGaussian(5, 100, alpha, beta)
-
-    Y1=Y[:, 0, 0]
-    S1=skills[:, 0]
-
-    x=np.arange(100)
-    plt.scatter(x, Y1, color="r")
-    plt.plot(x, S1)
-    plt.show()
-
-
-
+from scipy.stats._continuous_distns import _norm_pdf as pdf
+from scipy.stats._continuous_distns import _norm_cdf as cdf
+from scipy.stats import norm
+from scipy.stats._continuous_distns import _norm_pdf
+from joblib import Parallel, delayed
+matplotlib.use("pdf")
 
 def optiElo_K():
 
@@ -208,33 +46,31 @@ def optiElo_K():
         K=goldenSearch(costFunc, ["K"], [[0, 1]], reduction=0.001)
         print(K)
 
-
-
-def optiOn5(iter=1):
-    scale = 10
-    beta = 0.99
-    alpha = (1 - beta ** 2)*100
+def plot_e_v0(iter=1):
+    scale = 1
+    beta = 0.98
+    alpha = (1 - beta ** 2)*scale**2
 
     print("genValues:", alpha, beta)
 
     model = Model("Thurstone", scale)
 
+    data=dataNHL_K
+
     infers=[]
-
-    for i in range(0, 5):
-        data=createSyntheticDataSet(alpha, beta, model)
-        infers.append(SKF(data, model))
-
-    infTest=SKF(createSyntheticDataSet(alpha, beta, model), model)
+    n=30
+    for i in range(0, n):
+        data=createSyntheticDataSet(alpha, beta, model, players=8, days=100)
+        infers.append(KalmanFilter(data, model, "KF"))
 
     def LSon5(params):
-        alph=params[0]
-        bet=params[1]
+        e=params[0]
+        v0=params[1]
         temp=0
-        print(alph, bet)
+        print(e, v0)
         for inf in infers:
             inf.data.resetParam()
-            inf.infer(alph, bet, iter=iter)
+            inf.infer(e, 0.98, var0=v0, iter=iter)
             temp+=getLSOnInfer(inf, P=inf.data.P)
 
         ret=temp/len(infers)
@@ -243,147 +79,38 @@ def optiOn5(iter=1):
         return ret
 
 
-    alphRange=np.arange(0.5,5.1, 0.5)
-    betRange=np.arange(9900, 10001, 20)/10000
-    val=plotLS3D(LSon5, alphRange, betRange, scale)
+    epsRange = alpha*np.arange(30,171, 10)/100
+    #betRange=np.arange(9900, 10001, 50)/10000
+    v0Range = scale*np.arange(30, 171, 10)/100
+    val=plotLS3D(LSon5, epsRange, v0Range, scale)
 
-    infTest.infer(val["alpha"], val["beta"], iter=iter)
-    print(getLSOnInfer(infTest))
-
-def optiOnHockey(iter=1):
-
-    scale=100
-
-    model=Model("Thurstone", scale)
-
-    seasons=["2007-2008","2008-2009","2009-2010", "2010-2011","2011-2012"]
-    #seasons=["2007-2008"]
-
-    infers=[]
-
-    for s in seasons:
-        data=SDS(s, "H")
-        infers.append(KF(data.data, model))
-
-    def LSon5(params):
-        alph=params[0]
-        bet=params[1]
-        temp=0
-        print(alph, bet)
-        for inf in infers:
-            inf.data.resetParam()
-            inf.infer(alph, bet, iter=iter)
-            temp+=getLSOnInfer(inf, P=inf.data.P)
-
-        ret=temp/len(infers)
-        print(ret)
-
-        return ret
-
-    #alphRange=np.arange(1,101, 20)
-    #betRange=np.arange(999, 1000, 0.2)/1000
-    alphRange=np.arange(0,2.1, 0.2)
-    betRange=np.arange(10000, 10001, 2)/10000
-
-    #25, 0,9994
-
-    #val=naiveOpti(LSon5, [alphRange, betRange])
-    #print(val)
-
-    plotLS3D(LSon5, alphRange, betRange, scale)
-
-
-def plot():
-
-    scale = 1
-    model = Model("Thurstone", scale)
-    modelNHL=Model("BradleyTerry", scale)
-    modelGauss=Model("Gaussian", 1)
-    epsRange1=np.arange(0.1, 10.2, 2)/10000
-    betRange1 = [1]
-    epsRange2=np.arange(0.1, 10.1, 1)/100
-    betRange2=[0.95, 0.98, 1]
-    betRange2=[0.98]
-    epsRange3 = np.arange(0.2, 10.1, 0.2)/100
-    betRange3 = [0.95, 0.98, 1]
-    epsRange4=np.arange(2, 8.1, 0.5)/100
-    betRange4=[0.95, 0.98, 1]
-
-    #plotArgs(modelGauss, epsRange4, betRange4, "Gauss")
-    plotArgs(modelNHL, epsRange1, betRange1, "NHL")
-    #plotArgs(model, epsRange2, betRange2, "S1")
-    #plotArgs(model, epsRange3, betRange3, "S2")
-
-def plot2():
-    fig, ax=plt.subplots()
-    plotLS(dataNHL, ax, [20], mode="NHL")
-    #plt.show()
-    plt.savefig("LSoverTimeNHL.png")
-
-
-def findVar(data,scale, eps1, bet1, eps2, bet2, eps3, bet3, eps4, bet4):
-
-    model = Model("BradleyTerry", scale)
-
-    inf=SKF(data, model)
-    inf.infer(eps1, bet1, var0=70)
-    print(getLSOnInfer(inf, P=data.P))
-    var = data.parametersVar[-1]
-    print(np.mean(var))
-
-    mean=data.parametersMean
-    y=np.var(mean,axis=1)
-    x=np.arange(0, len(y))
-    plt.plot(x, y)
-
-
-    inf2=KF(data, model)
-    inf2.data.resetParam()
-    inf2.infer(eps2, bet2, var0=130)
-    print(getLSOnInfer(inf2, P=data.P))
-    var=data.parametersVar[-1]
-    var=np.diag(var)
-    print(np.mean(var))
-
-    mean=data.parametersMean
-    y2=np.var(mean,axis=1)
-    plt.plot(x, y2)
-    plt.show()
-
-    inf3=Trueskill(data, scale)
-    inf3.data.resetParam()
-    inf3.infer(eps3, bet3)
-    print(getLSOnInfer(inf3, P=data.P))
-    var = data.parametersVar[-1]
-    print(np.mean(var))
-
-    inf4=Glicko(data, scale)
-    inf4.data.resetParam()
-    inf4.infer(eps4, bet4)
-    print(getLSOnInfer(inf4, P=data.P))
-    var = data.parametersVar[-1]
-    print(np.mean(var))
-
+    print(val)
 
 def createInf(data, name, scale):
-    if name=="v-SKF-BT":
+    if name=="vSKF-BT":
         model=Model("BradleyTerry", scale)
-        return KalmanFilter(data, model, "v-SKF")
-    elif name=="v-SKF-T":
+        return KalmanFilter(data, model, "vSKF")
+    elif name=="vSKF-T":
         model=Model("Thurstone", scale)
-        return KalmanFilter(data, model, "v-SKF")
+        return KalmanFilter(data, model, "vSKF")
     elif name=="KF-BT":
         model=Model("BradleyTerry", scale)
         return KalmanFilter(data, model, "KF")
     elif name=="KF-T":
         model=Model("Thurstone", scale)
         return KalmanFilter(data, model, "KF")
-    elif name=="s-SKF-BT":
+    elif name=="sSKF-BT":
         model=Model("BradleyTerry", scale)
-        return KalmanFilter(data, model, "s-SKF")
-    elif name=="s-SKF-T":
+        return KalmanFilter(data, model, "sSKF")
+    elif name=="sSKF-T":
         model=Model("Thurstone", scale)
-        return KalmanFilter(data, model, "s-SKF")
+        return KalmanFilter(data, model, "sSKF")
+    elif name=="fSKF-BT":
+        model=Model("BradleyTerry", scale)
+        return KalmanFilter(data, model, "fSKF")
+    elif name=="fSKF-T":
+        model=Model("Thurstone", scale)
+        return KalmanFilter(data, model, "fSKF")
     elif name=="Elo":
         return Elo(data, scale)
     elif name=="Glicko":
@@ -402,31 +129,6 @@ def getInfers(data, list, scale):
         Infers.append(infers)
     return Infers
 
-
-def getTableLSEpsilon(data):
-
-
-    scale=100
-    K=K_H*scale**2
-
-    epsArgsH=np.arange(0.01, 0.07, 0.005)*scale**2
-    betArgsH=[0.98]
-    var0H=[0]
-
-    #names= ["SKF","KF","Trueskill","Glicko", "Elo"]
-    names=["SSKF-T","SKF-T","KF-T","Trueskill","SSKF-BT","SKF-BT", "KF-BT", "Glicko"]
-    Infers=getInfers(data,names, scale)
-    epsArgs = []
-    betArgs=[]
-    varArgs=[]
-
-    for i in range(len(names)):
-        epsArgs.append(epsArgsH)
-        betArgs.append(betArgsH)
-        varArgs.append(var0H)
-
-    plotArgs(Infers, epsArgs, betArgs, varArgs, K, "LS_S2_E98Correct")
-
 def getLSTableNHL():
     scale=100
     K=K_H*scale**2
@@ -439,45 +141,280 @@ def getLSTableNHL():
     varArgs=[[29], [24], [30], [15], [15], [15], [0]]
     plotArgs(Infers, epsArgs, betArgs, varArgs, K, "LS_NHL_Opti")
 
+def optimalSearchA(algoList, dataList, epsilon, beta, scale, iter=1):
 
-def getTableLSVar(data,eps,var,scale, name):
+    timeInLS=0
+    timeInKF=0
 
-    K=K_H*scale**2
+    Algos=getInfers(dataList, algoList, scale)
+    epsRange=epsilon*np.array([1])
+    betRange=[0.98, beta, 1]
+    varRange=[0, 1, 2]
 
-    epsValues=np.arange(0, 1.1, 0.2)
-    varValues=np.arange(0.1, 1.2, 0.2)
+    n=len(dataList)
+
+    minLS={}
+    minParam={}
+    for name in algoList:
+        minLS[name]=10
+        minParam[name]=None
+
+    I=0
+    for e in epsRange:
+        for b in betRange:
+            for v0 in varRange:
+                I+=1
+                print(I, "e:"+str(e), "b:"+str(b), "v0:"+str(v0))
+                for i, name in enumerate(algoList):
+                    LS=0
+                    for Ai in Algos[i]:
+                        Ai.data.resetParam()
+                        a=time()
+                        Ai.infer(e, b, var0=v0, iter=iter)
+                        B=time()
+                        timeInKF+=(B-a)
+                        c=time()
+                        LS+=getLSOnInfer(Ai, P=Ai.data.P, start=int(len(Ai.data.input)/2))/n
+                        d=time()
+                        timeInLS+=(d-c)
+                    if LS<minLS[name]:
+                        minLS[name]=LS
+                        minParam[name]={"e":e, "b":b, "v0":v0}
+
+    print(timeInKF)
+    print(timeInLS)
+    return minLS, minParam
+
+def getProbs(data, model, scale,e, b, v0, iter, indexes):
+    A=createInf(data, model, scale)
+    return A.infer(e, b, var0=v0, iter=iter, switchIndex=indexes)
+
+def genData(n, e, b, model=Model("Thurstone", 1), replacement=[]):
+    dataList=[]
+    indexes=[]
+    for i in range(n):
+        data, index=createSyntheticDataSet(e, b,model, 20, 100, replacement=replacement)
+        dataList.append(data)
+        indexes.append(index)
+    return dataList, indexes
+
+def meanLS(probs, P):
+    LS=[]
+    for n in range(len(probs)):
+        LSn=[]
+        for i in range(len(probs[n])):
+            LSn.append(np.sum(-np.log(probs[n][i])*P[n][i]))
+        LS.append(LSn)
+
+    return LS
+
+def D_KL(probs, P):
+
+    DK=[]
+    for n in range(len(probs)):
+        DKn=[]
+        for i in range(len(probs[n])):
+            DKn.append(np.sum( P[n][i] * np.log(P[n][i]/probs[n][i]) ))
+        DK.append(DKn)
+    return DK
 
 
-    names= [name]
-    #names=["Trueskill", "Elo"]
-    Infers=getInfers(data,names, scale)
-    epsArgs = [epsValues*eps]
-    betArgs=[[1]]
-    varArgs=[varValues*var]
+def Figure1(b=0.998, s=1, v0=1, dkl=True, replacement=[]):
+    replace=""
+    if len(replacement)>0:
+        replace=replacement[0]
 
-    plotArgs(Infers, epsArgs, betArgs, varArgs, K, name)
+    a=time()
+
+    scale=s
+    beta=b
+    var0=v0
+    epsilon=1-beta**2
+    model=Model("Thurstone", scale)
+    N=5000
+    algos=["KF-T"]
+
+    betaHat=[0.98, 0.998, 1]
+    #betaHat=[0.998]
+
+    dataList, indexes=genData(N, epsilon, beta, model=model, replacement=replacement)
+
+    x=np.arange(0, len(dataList[0].input))
+    A=algos[0]
+
+    colors=["m", "g", "b"]
 
 
+    for bH in betaHat:
+
+        probA=Parallel(n_jobs=4)(delayed(getProbs)(D, A, 1,  epsilon, bH, var0, 1, indexes[i]) for i, D in enumerate(dataList))
+        if dkl==True:
+            plot = Parallel(n_jobs=4)(delayed(D_KL)(probA[i], D.P) for i, D in enumerate(dataList))
+        else:
+            plot=Parallel(n_jobs=4)(delayed(meanLS)(probA[i], D.P) for i,D in enumerate(dataList))
+
+        #for i, D in enumerate(dataList):
+        #    probA[i]=np.mean(meanLS(probA[i], D.P), axis=1)
 
 
-#optiOnHockey(iter=1)
-testK()
-#optiOn5()
-#plot2()
-#test3()
-#testElo()
+        c=colors.pop()
+        plt.plot(x, np.mean(plot, axis=(0, 2)), color=c,linestyle="solid",label=bH)
+        quant3=np.quantile(plot, 0.75,  axis=(2, 0))
+        plt.plot(x, quant3,color=c,linestyle="dashed")
+        med=np.quantile(plot, 0.5,  axis=(2, 0))
+        plt.plot(x, med, color=c, linestyle="dotted")
+
+    b=time()
+    print(b-a)
+    plt.legend(loc="upper right")
+    plt.title("beta:"+str(beta)+"  sigma:"+str(scale)+"  var0:"+str(var0))
+    plt.show()
+    if dkl:
+        name="--D_KLoverTime-"
+    else:
+        name="--LSoverTime-"
+    plt.savefig("fig/"+replace+"--"+str(A)+name+str(beta)+"-sig-"+str(scale)+"-v0-"+str(var0)+".jpg")
+    plt.clf()
+
+def Figure2(b=0.998, s=1, v0=1, dkl=True, replacement=[]):
+    replace=""
+    if len(replacement)>0:
+        replace=replacement[0]
+
+    a=time()
+
+    scale=s
+    beta=b
+    var0=v0
+    epsilon=1-beta**2
+    bHat = 1
+    model=Model("Thurstone", scale)
+    N=5000
+    algos=["KF-T","vSKF-T","sSKF-T","Trueskill", "fSKF-T", "Elo"]
+    vars=[1, 1, 1, 1, 0.2, 0.1]
+
+    dataList, indexes=genData(N, epsilon, beta, model=model, replacement=replacement)
+
+    x=np.arange(0, len(dataList[0].input))
+    A=algos[0]
+
+    colors=["m", "g", "b", "k", "y","r"]
+    plt.figure(figsize=(15, 8))
+
+
+    for k, A in enumerate(algos):
+
+        probA=Parallel(n_jobs=4)(delayed(getProbs)(D, A, 1,  epsilon, bHat, vars[k], 1, indexes[i]) for i, D in enumerate(dataList))
+        if dkl==True:
+            plot = Parallel(n_jobs=4)(delayed(D_KL)(probA[i], D.P) for i, D in enumerate(dataList))
+        else:
+            plot=Parallel(n_jobs=4)(delayed(meanLS)(probA[i], D.P) for i,D in enumerate(dataList))
+
+        #for i, D in enumerate(dataList):
+        #    probA[i]=np.mean(meanLS(probA[i], D.P), axis=1)
+
+
+        c=colors.pop()
+        plt.plot(x, np.mean(plot, axis=(0, 2)), color=c,linestyle="solid",label=algos[k])
+        #quant3=np.quantile(plot, 0.75,  axis=(2, 0))
+        #plt.plot(x, quant3,color=c,linestyle="dashed")
+        #med=np.quantile(plot, 0.5,  axis=(2, 0))
+        #plt.plot(x, med, color=c, linestyle="dotted")
+
+    b=time()
+    print(b-a)
+    plt.legend(loc="upper right")
+    plt.title("beta:"+str(beta)+"  sigma:"+str(scale)+"  var0:"+str(var0))
+    plt.ylim([0, 0.3])
+    plt.show()
+    if dkl:
+        name="--D_KLoverTime-"
+    else:
+        name="--LSoverTime-"
+    plt.savefig("fig/"+replace+"--"+"ManyAlgos"+name+str(beta)+"-sig-"+str(scale)+"-v0-"+str(var0)+".jpg")
+    plt.clf()
+
+def plotSkills():
+
+    scale=1
+    beta=0.98
+    epsilon=1-beta**2
+    model=Model("Thurstone", scale)
+
+    X, Y, P, skills = genSynthModel(8, 100, epsilon, beta, model=model)
+    #varSkills=np.var(skills, axis=1)
+    x=np.arange(0,len(skills))
+    plt.plot(x, skills)
+    plt.show()
+
+def translate(data):
+
+    Y=data.output
+    X=data.input
+    P=data.P
+    col=["home_player", "away_player", "game_result", "real_proba", "time_stamp"]
+    D=[]
+    num=np.arange(0, X.shape[2])
+    for n in range(len(X)):
+        for i in range(len(X[n])):
+            home=np.where(X[n, i]==1)[0][0]
+            away=np.where(X[n, i]==-1)[0][0]
+            result=np.where(Y[n, i]==0)[0][0]
+            realProb=P[n, i][0]
+            timestamp=n
+
+            D.append([home, away, result, realProb, timestamp])
+
+    return pd.DataFrame(D, columns=col)
+
+def test():
+
+    scale=1
+    beta=0.998
+    epsilon=1-beta**2
+    model=Model("Thurstone", scale)
+
+    X, Y, P, skills = genSynthModel(10, 200, epsilon, beta, model=model)
+    data=DataSet(X, Y, X.shape[2], Y.shape[2])
+    data.P=P
+    res=translate(data)
+    PAR={"home":0, "beta":beta, "epsilon":epsilon, "v0":1, "scale":scale, "rating_algorithm":"KF","rating_model":"Thurston","it":1,"metric_type":"DKL", "PAR_gen":{"scenario":None}}
+
+    skills, LS, V, MSE=Kalman(res, PAR)
+    #print(skills.loc[0])
+
+    KF1=KalmanFilter(data.copy(), model,  "KF")
+    probs=KF1.infer(epsilon, beta, var0=scale, iter=1)
+    V2=KF1.data.parametersVar
+    DKL=D_KL(probs, P)
+
+    LS=LS.reshape(200, 5)
+    print(LS)
+    print(DKL)
+    DKL=np.mean(DKL, axis=1)
+    LS = np.mean(LS, axis=1)
+
+    x=np.arange(0, 200)
+    plt.plot(x, DKL)
+    plt.plot(x, LS)
+    plt.show()
+
 #test()
-#optiElo_K()
-#plot()
-#testGauss()
-#findVar(dataNHL_K[0], 100, 0.9, 1, 0.9, 1, 0.9, 1, 0.9, 1 )
-#getTableLSEpsilon(dataS2_K)
-scale=100
-#getTableLSVar(dataNHL_K,0.9,150,scale, "SKF-BT")
-#getTableLSVar(dataNHL_K,0.9,150,scale, "KF-BT")
-#getTableLSVar(dataNHL_K,0.9,150,scale, "Glicko")
-#getTableLSVar(dataNHL_K,1.7,290,scale, "SKF-T")
-#getTableLSVar(dataNHL_K,1.3,240,scale, "KF-T")
-#getTableLSVar(dataNHL_K,1.7,300,scale, "Trueskill")
-#getLSTableNHL()
+#plotSkills()
+Figure1(0.998, 1, 1, replacement=["top", 50])
+Figure1(0.998, 1, 1, replacement=["bottom", 50])
+Figure1(0.998, 1, 1, replacement=["rand", 50])
+Figure1(0.998, 1, 1, replacement=[])
+Figure1(0.998, 1, 1,dkl=False, replacement=["top", 50])
+Figure1(0.998, 1, 1,dkl=False, replacement=["bottom", 50])
+Figure1(0.998, 1, 1,dkl=False, replacement=["rand", 50])
+Figure1(0.998, 1, 1,dkl=False, replacement=[])
+#Figure1(0.998, 1, 0)
+#Figure1(0.98, 1, 1)
+#Figure1(0.98, 1, 0)
+
+
+
+
+
 

@@ -32,6 +32,8 @@ class Glicko:
         X=self.data.input
         Y=self.data.output
 
+        self.probs = np.zeros(Y.shape)
+
         if self.data.cov==True:
             self.data.setCov(False)
 
@@ -39,12 +41,12 @@ class Glicko:
 
         for i, Xi in enumerate(X):
 
-            if i+1==len(X):
-                break
             theta_I = beta * self.data.parametersMean[i]
             var_I = (((beta**2)*self.data.parametersVar[i]) + epsilon)
 
             for j, xij in enumerate(Xi):
+
+                self.probs[i, j] = self.getProbs(theta_I, xij, var_I, Y[i][j])
 
                 play1=np.where(xij==1)
                 play2=np.where(xij==-1)
@@ -56,9 +58,13 @@ class Glicko:
                 theta_I[play1]=theta_I[play1]+a*v1*self.r(v2)*(Y[i][j][0]-self.F(self.r(v2)*z/self.scale))
                 theta_I[play2] = theta_I[play2] + a * v2 * self.r(v1) * (Y[i][j][1] - self.F(self.r(v1) * -z / self.scale))
 
+            if i+1==len(X):
+                break
 
             self.data.parametersMean[i+1]=theta_I
             self.data.parametersVar[i+1]=var_I
+
+        return self.probs
 
 
     def PH(self, theta, x, V):
