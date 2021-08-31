@@ -315,20 +315,20 @@ class Thurstone:
         return self.FA(theta, x,add=var)
 
     def derLogFh(self, theta, x, add=0):
-        z = np.dot(theta, x) / math.sqrt((self.scale**2))
+        z = np.dot(theta, x) / math.sqrt((self.scale**2+add))
         return (pdf(z)/cdf(z))/(self.scale)
 
     def derLogFa(self, theta, x, add=0):
-        z = np.dot(-theta, x) / math.sqrt((self.scale**2))
+        z = np.dot(-theta, x) / math.sqrt((self.scale**2+add))
         return -(pdf(z)/cdf(z))/(self.scale)
 
     def hessianH(self, theta, x, add=0):
-        z = np.dot(theta, x) / math.sqrt((self.scale**2))
+        z = np.dot(theta, x) / math.sqrt((self.scale**2+add))
         val=(z*pdf(z)*cdf(z)+pdf(z)**2)/(cdf(z)**2)
         return val/(self.scale)**2
 
     def hessianA(self, theta, x, add=0):
-        z = np.dot(-theta, x) / math.sqrt((self.scale**2))
+        z = np.dot(-theta, x) / math.sqrt((self.scale**2+add))
         val=(z*pdf(z)*cdf(z)+pdf(z)**2)/(cdf(z)**2)
         return val/(self.scale)**2
 

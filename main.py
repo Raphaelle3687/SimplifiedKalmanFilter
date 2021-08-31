@@ -14,13 +14,13 @@ from Elo import Elo
 from Trueskill import Trueskill
 np.seterr("raise")
 from time import time
-from Glicko import Glicko
+from Glicko import Glicko as G
 from scipy.stats._continuous_distns import _norm_pdf as pdf
 from scipy.stats._continuous_distns import _norm_cdf as cdf
 from scipy.stats import norm
 from scipy.stats._continuous_distns import _norm_pdf
 from joblib import Parallel, delayed
-matplotlib.use("pdf")
+#matplotlib.use("pdf")
 
 def optiElo_K():
 
@@ -289,9 +289,9 @@ def Figure2(b=0.998, s=1, v0=1, dkl=True, replacement=[]):
     epsilon=1-beta**2
     bHat = 1
     model=Model("Thurstone", scale)
-    N=5000
-    algos=["KF-T","vSKF-T","sSKF-T","Trueskill", "fSKF-T", "Elo"]
-    vars=[1, 1, 1, 1, 0.2, 0.1]
+    N=1000
+    algos=["vSKF-T","Trueskill","Glicko"]
+    vars=[1, 1, 1]
 
     dataList, indexes=genData(N, epsilon, beta, model=model, replacement=replacement)
 
@@ -318,8 +318,8 @@ def Figure2(b=0.998, s=1, v0=1, dkl=True, replacement=[]):
         plt.plot(x, np.mean(plot, axis=(0, 2)), color=c,linestyle="solid",label=algos[k])
         #quant3=np.quantile(plot, 0.75,  axis=(2, 0))
         #plt.plot(x, quant3,color=c,linestyle="dashed")
-        #med=np.quantile(plot, 0.5,  axis=(2, 0))
-        #plt.plot(x, med, color=c, linestyle="dotted")
+        med=np.quantile(plot, 0.5,  axis=(2, 0))
+        plt.plot(x, med, color=c, linestyle="dotted")
 
     b=time()
     print(b-a)
@@ -331,8 +331,72 @@ def Figure2(b=0.998, s=1, v0=1, dkl=True, replacement=[]):
         name="--D_KLoverTime-"
     else:
         name="--LSoverTime-"
-    plt.savefig("fig/"+replace+"--"+"ManyAlgos"+name+str(beta)+"-sig-"+str(scale)+"-v0-"+str(var0)+".jpg")
+    plt.savefig("fig/"+replace+"--"+"vSFK_TS_GL"+name+str(beta)+"-sig-"+str(scale)+"-v0-"+str(var0)+".jpg")
     plt.clf()
+
+def Figure3(b=0.998, s=1, v0=1, dkl=True, replacement=[]):
+    replace=""
+    if len(replacement)>0:
+        replace=replacement[0]
+
+    a=time()
+
+    scale=s
+    beta=b
+    var0=v0
+    epsilon=1-beta**2
+    bHat = 1
+    model=Model("Thurstone", scale)
+    N=1000
+    algos=["fSKF-T", "fSKF-BT","Elo"]
+    vars=[0.05, 0.1, 0.2, 0.3]
+
+    dataList, indexes=genData(N, epsilon, beta, model=model, replacement=replacement)
+
+    x=np.arange(0, len(dataList[0].input))
+    A=algos[0]
+
+    colors=["m", "g", "b", "k", "y","r"]
+    linestyles=["solid", "dashed", "dotted", "dashdot"]
+    plt.figure(figsize=(15, 8))
+
+
+    for kk, A in enumerate(algos):
+
+        c = colors.pop()
+
+        for k in range(len(vars)):
+
+            probA=Parallel(n_jobs=4)(delayed(getProbs)(D, A, 1,  epsilon, bHat, vars[k], 1, indexes[i]) for i, D in enumerate(dataList))
+            if dkl==True:
+                plot = Parallel(n_jobs=4)(delayed(D_KL)(probA[i], D.P) for i, D in enumerate(dataList))
+            else:
+                plot=Parallel(n_jobs=4)(delayed(meanLS)(probA[i], D.P) for i,D in enumerate(dataList))
+
+        #for i, D in enumerate(dataList):
+        #    probA[i]=np.mean(meanLS(probA[i], D.P), axis=1)
+
+
+
+            plt.plot(x, np.mean(plot, axis=(0, 2)), color=c,linestyle=linestyles[k],label=algos[kk]+"v0:"+str(vars[k]))
+        #quant3=np.quantile(plot, 0.75,  axis=(2, 0))
+        #plt.plot(x, quant3,color=c,linestyle="dashed")
+        #med=np.quantile(plot, 0.5,  axis=(2, 0))
+        #plt.plot(x, med, color=c, linestyle="dotted")
+
+    b=time()
+    print(b-a)
+    plt.legend(loc="upper right")
+    plt.title("beta:"+str(beta)+"  sigma:"+str(scale))
+    plt.ylim([0, 0.5])
+    plt.show()
+    if dkl:
+        name="--D_KLoverTime-"
+    else:
+        name="--LSoverTime-"
+    plt.savefig("fig/"+replace+"--"+"fSKFvsELO"+name+str(beta)+"-sig-"+str(scale)+"-v0-"+str(var0)+".jpg")
+    plt.clf()
+
 
 def plotSkills():
 
@@ -360,6 +424,7 @@ def translate(data):
             home=np.where(X[n, i]==1)[0][0]
             away=np.where(X[n, i]==-1)[0][0]
             result=np.where(Y[n, i]==0)[0][0]
+            result=Y[n, i][0]
             realProb=P[n, i][0]
             timestamp=n
 
@@ -374,41 +439,60 @@ def test():
     epsilon=1-beta**2
     model=Model("Thurstone", scale)
 
-    X, Y, P, skills = genSynthModel(10, 200, epsilon, beta, model=model)
+    X, Y, P, skills, indexes = genSynthModel(10, 200, epsilon, beta, model=model)
     data=DataSet(X, Y, X.shape[2], Y.shape[2])
     data.P=P
     res=translate(data)
-    PAR={"home":0, "beta":beta, "epsilon":epsilon, "v0":1, "scale":scale, "rating_algorithm":"KF","rating_model":"Thurston","it":1,"metric_type":"DKL", "PAR_gen":{"scenario":None}}
 
-    skills, LS, V, MSE=Kalman(res, PAR)
+    beta=1
+
+    PAR={"home":0, "beta":beta, "epsilon":epsilon, "v0":1, "scale":scale, "rating_algorithm":"Glicko","rating_model":"Bradley-Terry","it":1,"metric_type":"DKL", "PAR_gen":{"scenario":None}}
+
+    skills, LS, V, MSE=Glickog(res, PAR)
     #print(skills.loc[0])
 
-    KF1=KalmanFilter(data.copy(), model,  "KF")
-    probs=KF1.infer(epsilon, beta, var0=scale, iter=1)
+    KF1=G(data.copy(), scale)
+    probs=KF1.infer(epsilon, beta, var0=scale-epsilon, iter=1)
     V2=KF1.data.parametersVar
+    S=KF1.data.parametersMean
     DKL=D_KL(probs, P)
 
     LS=LS.reshape(200, 5)
-    print(LS)
-    print(DKL)
     DKL=np.mean(DKL, axis=1)
     LS = np.mean(LS, axis=1)
 
-    x=np.arange(0, 200)
-    plt.plot(x, DKL)
+    x=np.arange(1, 200)
+    """plt.plot(x, DKL)
     plt.plot(x, LS)
+    plt.show()"""
+
+    skillsDiff=[]
+
+    for i in range(len(KF1.data.parametersMean)-1):
+        iT=5*i+4
+        gneuh=skills.iloc[i]
+        skillsDiff.append(KF1.data.parametersMean[i+1]-skills.iloc[iT])
+
+    print(skillsDiff)
+
+    plt.plot(x, skillsDiff)
     plt.show()
 
-#test()
+test()
 #plotSkills()
-Figure1(0.998, 1, 1, replacement=["top", 50])
+#Figure2(0.998, 1, 1, replacement=["top", 50])
+#Figure2(0.998, 1, 1, replacement=["bottom", 50])
+#Figure2(0.998, 1, 1, replacement=["rand", 50])
+#Figure3(0.998, 1, 1, replacement=["rand", 50])
+#Figure2(0.998, 1, 1, replacement=[])
+"""Figure1(0.998, 1, 1, replacement=["top", 50])
 Figure1(0.998, 1, 1, replacement=["bottom", 50])
 Figure1(0.998, 1, 1, replacement=["rand", 50])
 Figure1(0.998, 1, 1, replacement=[])
 Figure1(0.998, 1, 1,dkl=False, replacement=["top", 50])
 Figure1(0.998, 1, 1,dkl=False, replacement=["bottom", 50])
 Figure1(0.998, 1, 1,dkl=False, replacement=["rand", 50])
-Figure1(0.998, 1, 1,dkl=False, replacement=[])
+Figure1(0.998, 1, 1,dkl=False, replacement=[])"""
 #Figure1(0.998, 1, 0)
 #Figure1(0.98, 1, 1)
 #Figure1(0.98, 1, 0)
